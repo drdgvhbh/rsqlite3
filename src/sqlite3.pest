@@ -1,0 +1,4 @@
+program = { meta_command }
+meta_command = { exit }
+
+exit = { ".exit" }
