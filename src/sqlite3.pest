@@ -1,4 +1,21 @@
-program = { meta_command }
+program = { meta_command | sql_stmt }
 meta_command = { exit }
 
 exit = { ".exit" }
+
+sql_stmt = { insert_stmt }
+insert_stmt = { insert ~ into ~ identifier ~ value_list ~ semi }
+
+identifier = @{ !(keyword | delim) ~ ASCII_ALPHANUMERIC+ }
+
+insert = _{ ^"INSERT" }
+into = _{ ^"INTO" }
+values = _{ ^"VALUES" }
+keyword = _{ insert | into | values }
+
+delim = _{ semi }
+semi = _{ ";" }
+
+value_list = { values ~ "(" ~ ")" }
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
