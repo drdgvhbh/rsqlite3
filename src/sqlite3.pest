@@ -3,19 +3,30 @@ meta_command = { exit }
 
 exit = { ".exit" }
 
-sql_stmt = { insert_stmt }
-insert_stmt = { insert ~ into ~ identifier ~ value_list ~ semi }
+sql_stmt = { (create_stmt | insert_stmt) ~ semi }
+create_stmt = { create ~ table ~ identifier ~ type_list }
+insert_stmt = { insert ~ into ~ identifier ~ value_list }
 
 identifier = @{ !(keyword | delim) ~ ASCII_ALPHANUMERIC+ }
 
 insert = _{ ^"INSERT" }
 into = _{ ^"INTO" }
 values = _{ ^"VALUES" }
-keyword = _{ insert | into | values }
+create = _{ ^"CREATE" }
+table = _{^"TABLE" }
+keyword = _{ insert | into | values | create | table }
 
+datatype = { integer }
+integer = _{ ^"INTEGER" }
 delim = _{ semi }
 semi = _{ ";" }
+comma = _{ "," }
 
-value_list = { values ~ "(" ~ ")" }
+left_paren = _{ "(" }
+right_paren = _{ ")" }
+
+type_list = { left_paren ~ datatype ~ ("," ~ datatype)* ~ right_paren }
+value_list = { values ~ left_paren ~ right_paren }
+
 
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
