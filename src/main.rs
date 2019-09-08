@@ -25,13 +25,18 @@ fn main() {
                 let ast = parse_result.ok().unwrap();
                 match ast {
                     Ast::Exit => break 'main,
-                    Ast::Create(t) => {
-                        let result = executor.add_table(&t);
+                    Ast::Create(schema) => {
+                        let result = executor.add_table(&schema);
                         if result.is_err() {
                             print_err(&result.unwrap_err());
                         }
                     }
-                    Ast::Insert(i) => println!("{:#?}", i),
+                    Ast::Insert(insertion) => {
+                        let result = executor.insert(&insertion);
+                        if result.is_err() {
+                            print_err(&result.unwrap_err());
+                        } 
+                    },
                 }
             }
             Err(ReadlineError::Interrupted) => {
@@ -52,7 +57,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Ast, Column, Datatype, Insertion, Table, Value},
+        ast::{Ast, Column, Datatype, Insertion, TableSchema, Value},
         sqlite3,
     };
 
@@ -67,8 +72,8 @@ mod tests {
             assert_eq!(
                 insert_stmt,
                 Ast::Insert(Insertion {
-                    column_names: Some(vec!["slices".to_string()]),
-                    values: vec![Value::Integer(15)],
+                    table_name: "apples".to_string(),
+                    values: vec![(Some("slices".to_string()), Value::Integer(15))],
                 })
             )
         }
@@ -84,7 +89,7 @@ mod tests {
             let insert_stmt = parse_result.unwrap();
             assert_eq!(
                 insert_stmt,
-                Ast::Create(Table {
+                Ast::Create(TableSchema {
                     name: "apples".to_string(),
                     columns: vec![Column {
                         name: Some("slices".to_string()),

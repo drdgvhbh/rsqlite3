@@ -1,14 +1,34 @@
-use crate::ast::{ Ast, Table, Datatype, Column, Insertion, Value };
+use crate::ast::{ Ast, TableSchema, Datatype, Column, Insertion, Value };
 
 grammar;
 
 pub Ast: Ast = {
     Exit => Ast::Exit,
     Create Table <name:Identifier> <columns:ColumnList> Semi
-        => Ast::Create(Table{ name, columns }),
-    Insert Into <table_name:Identifier> <column_names:IdentifierList?>
+        => Ast::Create(TableSchema{ name, columns }),
+    Insert Into <table_name:Identifier> <opt_column_names:IdentifierList?>
         Values <values:ValueList> Semi
-        => Ast::Insert(Insertion{ column_names, values }),
+        => {
+            let mut combined_values: Vec<(Option<String>, Value)> = vec![];
+            for i in 0..values.len() {
+                let mut column_name: Option<String> = None;
+                match opt_column_names.clone() {
+                    None => {},
+                    Some(column_names) => {
+                        if i < column_names.len() {
+                            column_name = Some(column_names[i].clone());
+                        }
+                    }
+                }
+                combined_values.push((
+                    column_name, 
+                    values[i].clone())); 
+            }
+            return Ast::Insert(Insertion{ 
+                table_name,
+                values: combined_values,
+            });
+        }
 }
 
 ColumnList: Vec<Column> = {

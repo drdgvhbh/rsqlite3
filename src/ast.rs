@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq)]
 pub enum Ast {
     Exit,
-    Create(Table),
+    Create(TableSchema),
     Insert(Insertion),
 }
 
@@ -19,15 +19,15 @@ pub struct Column {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Table {
+pub struct TableSchema {
     pub name: String,
     pub columns: Vec<Column>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Insertion {
-    pub column_names: Option<Vec<String>>,
-    pub values: Vec<Value>,
+    pub table_name: String,
+    pub values: Vec<(Option<String>, Value)>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
