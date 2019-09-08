@@ -11,6 +11,8 @@ pub struct Sqlite3Parser;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
+mod schema;
+
 fn main() {
     let mut rl = Editor::<()>::new();
     rl.load_history("history.txt");
