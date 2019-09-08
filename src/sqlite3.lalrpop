@@ -9,24 +9,17 @@ pub Ast: Ast = {
     Insert Into <table_name:Identifier> <opt_column_names:IdentifierList?>
         Values <values:ValueList> Semi
         => {
-            let mut combined_values: Vec<(Option<String>, Value)> = vec![];
-            for i in 0..values.len() {
-                let mut column_name: Option<String> = None;
-                match opt_column_names.clone() {
-                    None => {},
-                    Some(column_names) => {
-                        if i < column_names.len() {
-                            column_name = Some(column_names[i].clone());
-                        }
-                    }
+            let mut column_names = vec![];
+            match opt_column_names.clone() {
+                None => {},
+                Some(names) => {
+                    column_names = names.clone();
                 }
-                combined_values.push((
-                    column_name, 
-                    values[i].clone())); 
             }
             return Ast::Insert(Insertion{ 
                 table_name,
-                values: combined_values,
+                column_names,
+                values,
             });
         }
 }

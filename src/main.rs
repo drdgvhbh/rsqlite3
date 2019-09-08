@@ -73,7 +73,8 @@ mod tests {
                 insert_stmt,
                 Ast::Insert(Insertion {
                     table_name: "apples".to_string(),
-                    values: vec![(Some("slices".to_string()), Value::Integer(15))],
+                    column_names: vec!["slices".to_string()],
+                    values: vec![Value::Integer(15)],
                 })
             )
         }

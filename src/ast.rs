@@ -27,7 +27,8 @@ pub struct TableSchema {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Insertion {
     pub table_name: String,
-    pub values: Vec<(Option<String>, Value)>,
+    pub column_names: Vec<String>,
+    pub values: Vec<Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

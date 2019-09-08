@@ -2,8 +2,6 @@ use crate::ast::{Insertion, TableSchema, Value, Datatype};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap};
 
-
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct Table {
     name: String,
@@ -27,11 +25,11 @@ impl Executor {
         if self.tables.contains_key(&schema.name) {
             return Err(format!("table {} already exists", schema.name).to_string());
         }
-        let column_datatypes = vec![];
-        let column_names = HashMap::new();
+        let mut column_datatypes = vec![];
+        let mut column_names = HashMap::new();
         for (i, column) in schema.columns.iter().enumerate() {
-            column_datatypes.push(column.datatype);
-            match column.name {
+            column_datatypes.push(column.datatype.clone());
+            match column.name.clone() {
                 None => {},
                 Some(column_name) => { column_names.insert(column_name, i as u16); }
             }
@@ -39,7 +37,7 @@ impl Executor {
         self.tables.insert(
             schema.name.to_lowercase(),
             Table {
-                name: schema.name,
+                name: schema.name.clone(),
                 column_datatypes,
                 column_names,
                 rows: vec![],
