@@ -2,6 +2,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 mod ast;
+mod executor;
 mod sqlite3;
 
 use ast::Ast;
@@ -9,6 +10,8 @@ use ast::Ast;
 fn main() {
     let mut rl = Editor::<()>::new();
     rl.load_history("history.txt").ok();
+    let mut executor = executor::new_executor();
+    let print_err = |err: &str| println!("Error: {}", err.to_string());
     'main: loop {
         let readline = rl.readline("sqlite> ");
         match readline {
@@ -22,7 +25,12 @@ fn main() {
                 let ast = parse_result.ok().unwrap();
                 match ast {
                     Ast::Exit => break 'main,
-                    Ast::Create(t) => println!("{:#?}", t),
+                    Ast::Create(t) => {
+                        let result = executor.add_table(&t);
+                        if result.is_err() {
+                            print_err(&result.unwrap_err());
+                        }
+                    }
                     Ast::Insert(i) => println!("{:#?}", i),
                 }
             }
