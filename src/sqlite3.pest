@@ -1,4 +1,4 @@
-program = { meta_command | sql_stmt }
+program = { SOI ~ meta_command | sql_stmt ~ EOI | EOI }
 meta_command = { exit }
 
 exit = { ".exit" }

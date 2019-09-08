@@ -46,6 +46,7 @@ fn main() {
                             }
                         }
                     }
+                    Rule::EOI => {}
                     _ => println!("Unsupported command \'{}\'.", buffer),
                 }
             }
