@@ -1,0 +1,67 @@
+use crate::ast::{ Ast, Table, Datatype, Column, Insertion, Value };
+
+grammar;
+
+pub Ast: Ast = {
+    Exit => Ast::Exit,
+    Create Table <name:Identifier> <columns:ColumnList> Semi
+        => Ast::Create(Table{ name, columns }),
+    Insert Into <table_name:Identifier> <column_names:IdentifierList?>
+        Values <values:ValueList> Semi
+        => Ast::Insert(Insertion{ column_names, values }),
+}
+
+ColumnList: Vec<Column> = {
+    "(" <a:Column> <b:("," Column)*> ")" => {
+        let mut cols = vec![a];
+        cols.extend(b.iter()
+            .map(|x| x.1.clone()));
+        cols
+    }
+}
+
+Column: Column = {
+    <name:Identifier?> <datatype:Datatype> => Column{ name, datatype }
+}
+
+Datatype: Datatype = {
+    Integer => Datatype::Integer,
+}
+
+IdentifierList: Vec<String> = {
+    "(" <a:Identifier> <b:("," Identifier)*> ")" => {
+        let mut identifier_list = vec![a];
+        identifier_list.extend(b.iter()
+            .map(|x| x.1.clone()));
+        identifier_list
+    }
+}
+
+Identifier: String = <s:r"[a-zA-Z][a-zA-Z0-9]*"> => s.to_string();
+
+ValueList: Vec<Value> = {
+    "(" <a:Value> <b:("," Value)*> ")" => {
+        let mut value_list = vec![a];
+        value_list.extend(b.iter()
+            .map(|x| x.1.clone()));
+        value_list
+    }
+}
+
+Value: Value = {
+    <i:IntegerValue> => Value::Integer(i.parse::<i64>().unwrap())
+}
+
+match {
+    r".exit" => Exit,
+    r";" => Semi,
+    r"(?i)create" => Create,
+    r"(?i)table" => Table,
+    r"(?i)integer" => Integer,
+    r"(?i)insert" => Insert,
+    r"(?i)into" => Into,
+    r"(?i)values" => Values,
+    r"[0-9]+" => IntegerValue,
+} else {
+    _
+}
