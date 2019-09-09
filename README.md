@@ -6,8 +6,12 @@ Simple Sqlite3 implementation in Rust using a Read-Eval-Print-Loop interface.
 
 ## Running
 
+```sh
 cargo run
+```
 
 ## Tests
 
+```sh
 cargo test
+```
