@@ -14,7 +14,7 @@ fn main() {
     let print_err = |err: &str| println!("Error: {}", err.to_string());
     'main: loop {
         let readline = rl.readline("sqlite> ");
-        match readline {
+        match &readline {
             Ok(buffer) => {
                 rl.add_history_entry(buffer.as_str());
                 let parse_result = sqlite3::AstParser::new().parse(buffer.as_str());
@@ -23,7 +23,7 @@ fn main() {
                     continue;
                 }
                 let ast = parse_result.ok().unwrap();
-                match ast {
+                match &ast {
                     Ast::Exit => break 'main,
                     Ast::Create(schema) => {
                         let result = executor.add_table(&schema);
@@ -35,8 +35,8 @@ fn main() {
                         let result = executor.insert(&insertion);
                         if result.is_err() {
                             print_err(&result.unwrap_err());
-                        } 
-                    },
+                        }
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {
@@ -73,7 +73,7 @@ mod tests {
                 insert_stmt,
                 Ast::Insert(Insertion {
                     table_name: "apples".to_string(),
-                    column_names: vec!["slices".to_string()],
+                    column_names: Some(vec!["slices".to_string()]),
                     values: vec![Value::Integer(15)],
                 })
             )

@@ -6,22 +6,13 @@ pub Ast: Ast = {
     Exit => Ast::Exit,
     Create Table <name:Identifier> <columns:ColumnList> Semi
         => Ast::Create(TableSchema{ name, columns }),
-    Insert Into <table_name:Identifier> <opt_column_names:IdentifierList?>
+    Insert Into <table_name:Identifier> <column_names:IdentifierList?>
         Values <values:ValueList> Semi
-        => {
-            let mut column_names = vec![];
-            match opt_column_names.clone() {
-                None => {},
-                Some(names) => {
-                    column_names = names.clone();
-                }
-            }
-            return Ast::Insert(Insertion{ 
+        => Ast::Insert(Insertion{ 
                 table_name,
                 column_names,
                 values,
-            });
-        }
+            })
 }
 
 ColumnList: Vec<Column> = {
