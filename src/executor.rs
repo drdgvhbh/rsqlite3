@@ -67,31 +67,29 @@ impl Executor {
             ));
         }
 
-        match &insertion.column_names {
-            None => {
-                for i in 0..values.len() {
-                    insertion_indices.push(i);
-                }
+        if insertion.column_names.is_none() {
+            for i in 0..values.len() {
+                insertion_indices.push(i);
             }
-            Some(column_names) => {
-                if values.len() > column_names.len() {
+        } else {
+            let column_names = insertion.column_names.as_ref().unwrap();
+            if values.len() > column_names.len() {
+                return Err(format!(
+                    "{} values for {} columns",
+                    values.len(),
+                    column_names.len()
+                ));
+            }
+            for column_name in column_names {
+                let column_idx_opt = table.column_names.get(column_name);
+                if column_idx_opt.is_none() {
                     return Err(format!(
-                        "{} values for {} columns",
-                        values.len(),
-                        column_names.len()
+                        "table {} has no column named {}",
+                        table_name, column_name
                     ));
                 }
-                for column_name in column_names {
-                    let column_idx_opt = table.column_names.get(column_name);
-                    if column_idx_opt.is_none() {
-                        return Err(format!(
-                            "table {} has no column named {}",
-                            table_name, column_name
-                        ));
-                    }
-                    let column_idx = column_idx_opt.unwrap();
-                    insertion_indices.push(*column_idx);
-                }
+                let column_idx = column_idx_opt.unwrap();
+                insertion_indices.push(*column_idx);
             }
         }
 
