@@ -57,7 +57,9 @@ fn main() {
                     Ast::Insert(insertion) => {
                         let result = executor.insert(&insertion);
                         if result.is_err() {
-                            print_err(&result.unwrap_err());
+                            for err in &result.unwrap_err() {
+                                print_err(err);
+                            }
                         }
                     }
                 }

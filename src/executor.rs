@@ -49,23 +49,17 @@ impl Executor {
         Ok(())
     }
 
-    pub fn insert(&mut self, insertion: &Insertion) -> Result<(), String> {
+    pub fn insert(&mut self, insertion: &Insertion) -> Result<(), Vec<String>> {
         let table_name = &insertion.table_name;
         let table_opt = self.tables.get_mut(table_name);
+        let mut errs = Vec::<String>::new();
         if table_opt.is_none() {
-            return Err(format!("no such table: {}", table_name));
+            errs.push(format!("no such table: {}", table_name));
+            return Err(errs);
         }
         let table = table_opt.unwrap();
         let mut insertion_indices: Vec<usize> = vec![];
         let values = &insertion.values;
-        if values.len() > table.column_datatypes.len() {
-            return Err(format!(
-                "table {} has {} columns but {} values were supplied",
-                table_name,
-                table.column_datatypes.len(),
-                values.len(),
-            ));
-        }
 
         if insertion.column_names.is_none() {
             for i in 0..values.len() {
@@ -74,7 +68,7 @@ impl Executor {
         } else {
             let column_names = insertion.column_names.as_ref().unwrap();
             if values.len() > column_names.len() {
-                return Err(format!(
+                errs.push(format!(
                     "{} values for {} columns",
                     values.len(),
                     column_names.len()
@@ -83,14 +77,28 @@ impl Executor {
             for column_name in column_names {
                 let column_idx_opt = table.column_names.get(column_name);
                 if column_idx_opt.is_none() {
-                    return Err(format!(
+                    errs.push(format!(
                         "table {} has no column named {}",
                         table_name, column_name
                     ));
+                    continue;
                 }
                 let column_idx = column_idx_opt.unwrap();
                 insertion_indices.push(*column_idx);
             }
+        }
+
+        if values.len() > table.column_datatypes.len() {
+            errs.push(format!(
+                "table {} has {} columns but {} values were supplied",
+                table_name,
+                table.column_datatypes.len(),
+                values.len(),
+            ));
+        }
+
+        if !errs.is_empty() {
+            return Err(errs);
         }
 
         assert_eq!(insertion_indices.len(), values.len());
