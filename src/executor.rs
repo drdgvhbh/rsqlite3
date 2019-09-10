@@ -110,3 +110,111 @@ impl Executor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_fail_to_create_a_table_if_one_with_same_name_already_exists() {
+        let table_name = "apples";
+        let mut tables = HashMap::new();
+        tables.insert(
+            table_name.to_string(),
+            Table {
+                name: table_name.to_string(),
+                column_datatypes: vec![],
+                rows: vec![],
+                column_names: HashMap::new(),
+            },
+        );
+        let mut executor = Executor { tables };
+        let result = executor.add_table(&TableSchema {
+            name: table_name.to_string(),
+            columns: vec![],
+        });
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn should_fail_to_insert_row_if_table_does_not_exist() {
+        let table_name = "oranges".to_string();
+        let mut executor = Executor {
+            tables: HashMap::new(),
+        };
+        let result = executor.insert(&Insertion {
+            table_name,
+            column_names: None,
+            values: vec![],
+        });
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn should_fail_to_insert_row_if_row_has_more_columns_than_table() {
+        let table_name = "peaches".to_string();
+        let mut tables = HashMap::new();
+        tables.insert(
+            table_name.to_string(),
+            Table {
+                name: table_name.to_string(),
+                column_datatypes: vec![Datatype::Integer],
+                rows: vec![],
+                column_names: HashMap::new(),
+            },
+        );
+        let mut executor = Executor { tables };
+        let result = executor.insert(&Insertion {
+            table_name,
+            column_names: None,
+            values: vec![Value::Integer(32), Value::Integer(1337)],
+        });
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn should_fail_to_insert_row_if_num_values_exceeds_num_column_names() {
+        let table_name = "strawberries".to_string();
+        let mut tables = HashMap::new();
+        tables.insert(
+            table_name.to_string(),
+            Table {
+                name: table_name.to_string(),
+                column_datatypes: vec![Datatype::Integer],
+                rows: vec![],
+                column_names: HashMap::new(),
+            },
+        );
+        let mut executor = Executor { tables };
+        let result = executor.insert(&Insertion {
+            table_name,
+            column_names: Some(vec!["a".to_string()]),
+            values: vec![Value::Integer(32), Value::Integer(1337)],
+        });
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn should_fail_to_insert_row_if_one_of_the_column_names_does_not_exist() {
+        let table_name = "mud".to_string();
+        let mut tables = HashMap::new();
+        let mut column_names = HashMap::new();
+        column_names.insert("z".to_string(), 0);
+        tables.insert(
+            table_name.to_string(),
+            Table {
+                name: table_name.to_string(),
+                column_datatypes: vec![Datatype::Integer],
+                rows: vec![],
+                column_names,
+            },
+        );
+        let mut executor = Executor { tables };
+        let result = executor.insert(&Insertion {
+            table_name,
+            column_names: Some(vec!["a".to_string()]),
+            values: vec![Value::Integer(32)],
+        });
+        assert_eq!(result.is_err(), true);
+    }
+}
