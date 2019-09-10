@@ -5,6 +5,8 @@ mod ast;
 mod executor;
 mod sqlite3;
 
+use lalrpop_util::ParseError;
+
 use ast::Ast;
 
 fn main() {
@@ -19,7 +21,28 @@ fn main() {
                 rl.add_history_entry(buffer.as_str());
                 let parse_result = sqlite3::AstParser::new().parse(buffer.as_str());
                 if parse_result.is_err() {
-                    println!("Unrecognized command \'{}\'.", buffer);
+                    match &parse_result.unwrap_err() {
+                        ParseError::UnrecognizedToken { token, expected: _ } => {
+                            println!("Unexpected token \"{}\" at column {}.", token.1, token.0)
+                        }
+                        ParseError::UnrecognizedEOF {
+                            location,
+                            expected: _,
+                        } => {
+                            if location > &0 {
+                                println!("Unexpected EOF at column {}", location);
+                            }
+                        }
+                        ParseError::InvalidToken { location } => {
+                            println!("Invalid token at column {}", location);
+                        }
+                        ParseError::ExtraToken { token } => {
+                            println!("Extra token \"{}\" at column {}", token.1, token.0)
+                        }
+                        err => {
+                            println!("{:#?}", err);
+                        }
+                    }
                     continue;
                 }
                 let ast = parse_result.ok().unwrap();
