@@ -13,7 +13,7 @@ use ast::Ast;
 fn main() {
     let mut rl = Editor::<()>::new();
     rl.load_history("history.txt").ok();
-    let mut executor = executor::new_executor();
+    let mut executor = executor::Executor::new();
     let print_err = |err: &str| println!("Error: {}", err.to_string());
     'main: loop {
         let readline = rl.readline("sqlite> ");

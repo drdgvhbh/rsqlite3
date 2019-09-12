@@ -25,13 +25,13 @@ pub struct Executor {
     tables: Box<HashMap<String, Box<dyn Table>>>,
 }
 
-pub fn new_executor() -> Executor {
-    return Executor {
-        tables: Box::new(HashMap::new()),
-    };
-}
-
 impl Executor {
+    pub fn new() -> Box<Executor> {
+        return Box::new(Executor {
+            tables: Box::new(HashMap::new()),
+        });
+    }
+
     pub fn add_table(&mut self, table: Box<dyn Table>) -> Result<(), String> {
         let table_name = table.name();
         if self.table_exists(&table_name) {
