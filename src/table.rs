@@ -2,6 +2,8 @@ use crate::ast::{Column, Datatype, Value};
 use crate::executor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::iter::ExactSizeIterator;
+use std::iter::Iterator;
 use std::slice;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -56,9 +58,22 @@ impl executor::Table for Table {
     fn name(&self) -> &String {
         return &self.name;
     }
+
+    fn columns(&self) -> Box<[(String, Datatype)]> {
+        self.columns()
+    }
 }
 
 impl Table {
+    pub fn columns(&self) -> Box<[(String, Datatype)]> {
+        let mut columns = vec![];
+        for pair in &self.column_names {
+            let (column_name, i) = pair;
+            columns.push((column_name.clone(), self.column_datatypes[*i].clone()));
+        }
+
+        columns.into_boxed_slice()
+    }
     pub fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut Table, String> {
         if row.len() != self.row_len() {
             return Err(self.wrong_num_of_columns_error(row.len()));

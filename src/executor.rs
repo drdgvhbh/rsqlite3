@@ -1,4 +1,4 @@
-use crate::ast::Value;
+use crate::ast::{ColumnSet, Datatype, Value};
 use std::collections::HashMap;
 use std::slice;
 use std::slice::Iter;
@@ -11,6 +11,7 @@ pub trait Table {
         row: &HashMap<String, Value>,
     ) -> Result<&mut dyn Table, String>;
     fn row_len(&self) -> usize;
+    fn columns(&self) -> Box<[(String, Datatype)]>;
 }
 
 pub trait Insertion {
