@@ -50,7 +50,7 @@ fn main() {
                 match &ast {
                     Ast::Exit => break 'main,
                     Ast::Create(schema) => {
-                        let result = table::new_table(&schema.name, schema.columns.iter());
+                        let result = table::Table::new(&schema.name, schema.columns.iter());
                         match result {
                             Err(err) => print_err(&err),
                             Ok(table) => {

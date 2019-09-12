@@ -14,29 +14,6 @@ pub struct Table {
     column_names: HashMap<String, usize>,
 }
 
-pub fn new_table(table_name: &str, columns: slice::Iter<Column>) -> Result<Box<Table>, String> {
-    let mut column_datatypes = vec![];
-    let mut column_names = HashMap::new();
-    for (i, column) in columns.enumerate() {
-        column_datatypes.push(column.datatype.clone());
-        match &column.name {
-            None => {}
-            Some(column_name) => {
-                if column_names.contains_key(column_name) {
-                    return Err(format!("duplicate column name: {}", column_name));
-                }
-                column_names.insert(column_name.clone(), i);
-            }
-        }
-    }
-    return Ok(Box::new(Table {
-        name: table_name.to_lowercase(),
-        column_datatypes,
-        rows: vec![],
-        column_names,
-    }));
-}
-
 impl executor::Table for Table {
     fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut dyn executor::Table, String> {
         self.insert_row(row)
@@ -65,6 +42,28 @@ impl executor::Table for Table {
 }
 
 impl Table {
+    pub fn new(table_name: &str, columns: slice::Iter<Column>) -> Result<Box<Table>, String> {
+        let mut column_datatypes = vec![];
+        let mut column_names = HashMap::new();
+        for (i, column) in columns.enumerate() {
+            column_datatypes.push(column.datatype.clone());
+            match &column.name {
+                None => {}
+                Some(column_name) => {
+                    if column_names.contains_key(column_name) {
+                        return Err(format!("duplicate column name: {}", column_name));
+                    }
+                    column_names.insert(column_name.clone(), i);
+                }
+            }
+        }
+        return Ok(Box::new(Table {
+            name: table_name.to_lowercase(),
+            column_datatypes,
+            rows: vec![],
+            column_names,
+        }));
+    }
     pub fn columns(&self) -> Box<[(String, Datatype)]> {
         let mut columns = vec![];
         for pair in &self.column_names {
@@ -144,7 +143,7 @@ mod tests {
 
     #[test]
     fn new_tables_should_not_have_duplicate_column_names() {
-        let result = new_table(
+        let result = Table::new(
             "animals",
             vec![
                 Column {
@@ -163,7 +162,7 @@ mod tests {
 
     #[test]
     fn rows_with_wrong_column_size_should_fail_to_be_inserted() {
-        let mut table = new_table(
+        let mut table = Table::new(
             "animals",
             vec![
                 Column {
@@ -191,7 +190,7 @@ mod tests {
 
     #[test]
     fn rows_with_extraneous_column_name_should_fail_to_be_inserted() {
-        let mut table = new_table(
+        let mut table = Table::new(
             "animals",
             vec![Column {
                 name: Some("feet".to_string()),

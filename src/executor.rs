@@ -91,10 +91,10 @@ mod tests {
         let mut tables: Box<HashMap<String, Box<dyn Table>>> = Box::new(HashMap::new());
         tables.insert(
             table_name.to_string(),
-            table::new_table(table_name, vec![].iter()).unwrap(),
+            table::Table::new(table_name, vec![].iter()).unwrap(),
         );
         let mut executor = Executor { tables };
-        let table = table::new_table(&table_name, vec![].iter()).unwrap();
+        let table = table::Table::new(&table_name, vec![].iter()).unwrap();
         let result = executor.add_table(table);
         assert_eq!(result.is_err(), true);
     }
