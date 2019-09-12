@@ -4,6 +4,7 @@ use rustyline::Editor;
 mod ast;
 mod executor;
 mod sqlite3;
+mod table;
 
 use lalrpop_util::ParseError;
 
@@ -49,13 +50,19 @@ fn main() {
                 match &ast {
                     Ast::Exit => break 'main,
                     Ast::Create(schema) => {
-                        let result = executor.add_table(&schema);
-                        if result.is_err() {
-                            print_err(&result.unwrap_err());
+                        let result = table::new_table(&schema.name, schema.columns.iter());
+                        match result {
+                            Err(err) => print_err(&err),
+                            Ok(table) => {
+                                let result = executor.add_table(table);
+                                if result.is_err() {
+                                    print_err(&result.unwrap_err());
+                                }
+                            }
                         }
                     }
                     Ast::Insert(insertion) => {
-                        let result = executor.insert(insertion);
+                        let result = executor.insert(insertion.clone());
                         if result.is_err() {
                             print_err(&result.unwrap_err());
                         }

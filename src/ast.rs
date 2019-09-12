@@ -1,3 +1,4 @@
+use crate::executor;
 use serde::{Deserialize, Serialize};
 use std::slice::Iter;
 
@@ -62,6 +63,24 @@ pub fn new_insertion(
     });
 }
 
+impl executor::Insertion for Insertion {
+    fn table_name(&self) -> &String {
+        &self.table_name
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        self.validate()
+    }
+
+    fn column_names(&self) -> Option<Iter<String>> {
+        self.column_names()
+    }
+
+    fn values(&self) -> Iter<Value> {
+        self.values()
+    }
+}
+
 impl Insertion {
     pub fn validate(&self) -> Result<(), String> {
         return self
@@ -99,12 +118,12 @@ pub enum Value {
 }
 
 #[cfg(test)]
-mod tests {
+mod test_parsing {
     use super::*;
     use crate::sqlite3;
 
     #[test]
-    fn parses_insertion_statement() {
+    fn insertion_statement() {
         let statement = "INSERT INTO apples(slices) VALUES(15);";
         let parse_result = sqlite3::AstParser::new().parse(statement);
         if parse_result.is_err() {
@@ -123,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_create_table_statement() {
+    fn create_table_statement() {
         let statement = "CREATE TABLE apples(slices INTEGER);";
         let parse_result = sqlite3::AstParser::new().parse(statement);
         if parse_result.is_err() {
@@ -141,5 +160,22 @@ mod tests {
                 })
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod test_insertion {
+    use super::*;
+
+    #[test]
+    fn validation_fails_if_num_values_neq_num_columns() {
+        let table_name = "eggs";
+        let insertion = new_insertion(
+            table_name,
+            Some(vec!["count".to_string()]),
+            vec![Value::Integer(32), Value::Integer(1337)],
+        );
+        let result = insertion.validate();
+        assert_eq!(result.is_err(), true);
     }
 }

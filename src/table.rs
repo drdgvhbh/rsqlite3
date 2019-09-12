@@ -36,7 +36,30 @@ pub fn new_table(table_name: &str, columns: slice::Iter<Column>) -> Result<Box<T
 }
 
 impl executor::Table for Table {
-    fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<(), String> {
+    fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut dyn executor::Table, String> {
+        self.insert_row(row)
+            .map(|table| table as &mut dyn executor::Table)
+    }
+
+    fn insert_row_with_named_columns(
+        &mut self,
+        row: &HashMap<String, Value>,
+    ) -> Result<&mut dyn executor::Table, String> {
+        self.insert_row_with_named_columns(row)
+            .map(|table| table as &mut dyn executor::Table)
+    }
+
+    fn row_len(&self) -> usize {
+        self.row_len()
+    }
+
+    fn name(&self) -> &String {
+        return &self.name;
+    }
+}
+
+impl Table {
+    pub fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut Table, String> {
         if row.len() != self.row_len() {
             return Err(self.wrong_num_of_columns_error(row.len()));
         }
@@ -44,13 +67,13 @@ impl executor::Table for Table {
         let row_vec = row.map(|value| value.clone()).collect();
         self.rows.push(Box::new(row_vec));
 
-        Ok(())
+        Ok(self)
     }
 
     fn insert_row_with_named_columns(
         &mut self,
         row: &HashMap<String, Value>,
-    ) -> Result<(), String> {
+    ) -> Result<&mut Table, String> {
         if row.len() > self.row_len() {
             return Err(self.wrong_num_of_columns_error(row.len()));
         }
@@ -59,7 +82,7 @@ impl executor::Table for Table {
         let column_names = row.keys().map(|k| k.clone()).collect();
         let result = self.indices(&column_names, &mut indices);
         if result.is_err() {
-            return result;
+            return result.map(|_| self);
         }
 
         let mut row_vec = vec![Value::Null; self.row_len()];
@@ -69,15 +92,9 @@ impl executor::Table for Table {
         }
         self.rows.push(Box::new(row_vec));
 
-        Ok(())
+        Ok(self)
     }
 
-    fn row_len(&self) -> usize {
-        return self.row_len();
-    }
-}
-
-impl Table {
     fn indices(&self, column_names: &Vec<String>, dst: &mut Vec<usize>) -> Result<(), String> {
         for column_name in column_names {
             if !self.column_names.contains_key(column_name) {
@@ -103,5 +120,75 @@ impl Table {
 
     fn row_len(&self) -> usize {
         return self.column_datatypes.len();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_tables_should_not_have_duplicate_column_names() {
+        let result = new_table(
+            "animals",
+            vec![
+                Column {
+                    name: Some("feet".to_string()),
+                    datatype: Datatype::Integer,
+                },
+                Column {
+                    name: Some("feet".to_string()),
+                    datatype: Datatype::Integer,
+                },
+            ]
+            .iter(),
+        );
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn rows_with_wrong_column_size_should_fail_to_be_inserted() {
+        let mut table = new_table(
+            "animals",
+            vec![
+                Column {
+                    name: Some("feet".to_string()),
+                    datatype: Datatype::Integer,
+                },
+                Column {
+                    name: Some("eyes".to_string()),
+                    datatype: Datatype::Integer,
+                },
+            ]
+            .iter(),
+        )
+        .unwrap();
+        let result = table.insert_row(vec![Value::Integer(49)].iter());
+        assert_eq!(result.is_err(), true);
+
+        let mut row = HashMap::new();
+        row.insert("feet".to_string(), Value::Integer(4));
+        row.insert("eyes".to_string(), Value::Integer(2));
+        row.insert("heart".to_string(), Value::Integer(1));
+        let result = table.insert_row_with_named_columns(&row);
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn rows_with_extraneous_column_name_should_fail_to_be_inserted() {
+        let mut table = new_table(
+            "animals",
+            vec![Column {
+                name: Some("feet".to_string()),
+                datatype: Datatype::Integer,
+            }]
+            .iter(),
+        )
+        .unwrap();
+
+        let mut row = HashMap::new();
+        row.insert("eyes".to_string(), Value::Integer(2));
+        let result = table.insert_row_with_named_columns(&row);
+        assert_eq!(result.is_err(), true);
     }
 }
