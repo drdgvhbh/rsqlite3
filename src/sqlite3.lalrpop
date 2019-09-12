@@ -1,4 +1,4 @@
-use crate::ast::{ Ast, TableSchema, Datatype, Column, Insertion, Value };
+use crate::ast::{ Ast, TableSchema, Datatype, Column, Value, Selection, ColumnSet, new_insertion };
 
 grammar;
 
@@ -8,11 +8,14 @@ pub Ast: Ast = {
         => Ast::Create(TableSchema{ name, columns }),
     Insert Into <table_name:Identifier> <column_names:IdentifierList?>
         Values <values:ValueList> Semi
-        => Ast::Insert(Insertion{ 
-                table_name,
-                column_names,
-                values,
-            })
+        => Ast::Insert(new_insertion(
+            &table_name,
+            column_names,
+            values)),
+    Select Star From <table_name:Identifier> Semi => Ast::Select(Selection{
+        table_name,
+        columns: ColumnSet::WildCard,
+    })
 }
 
 ColumnList: Vec<Column> = {
@@ -59,6 +62,9 @@ Value: Value = {
 match {
     r".exit" => Exit,
     r";" => Semi,
+    r"\*" => Star,
+    r"(?i)from" => From,
+    r"(?i)select" => Select,
     r"(?i)create" => Create,
     r"(?i)table" => Table,
     r"(?i)integer" => Integer,

@@ -55,13 +55,12 @@ fn main() {
                         }
                     }
                     Ast::Insert(insertion) => {
-                        let result = executor.insert(&insertion);
+                        let result = executor.insert(insertion);
                         if result.is_err() {
-                            for err in &result.unwrap_err() {
-                                print_err(err);
-                            }
+                            print_err(&result.unwrap_err());
                         }
                     }
+                    Ast::Select(selection) => {}
                 }
             }
             Err(ReadlineError::Interrupted) => {
