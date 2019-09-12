@@ -2,9 +2,9 @@ use crate::ast::{Column, Datatype, Value};
 use crate::executor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::iter::ExactSizeIterator;
 use std::iter::Iterator;
 use std::slice;
+use std::slice::Iter;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Table {
@@ -15,6 +15,12 @@ pub struct Table {
 }
 
 impl executor::Table for Table {
+    fn select_rows(
+        &self,
+        column_names: Box<dyn Iterator<Item = String>>,
+    ) -> Result<Iter<Value>, String> {
+        self.select_rows(column_names)
+    }
     fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut dyn executor::Table, String> {
         self.insert_row(row)
             .map(|table| table as &mut dyn executor::Table)
@@ -36,7 +42,7 @@ impl executor::Table for Table {
         return &self.name;
     }
 
-    fn columns(&self) -> Box<[(String, Datatype)]> {
+    fn columns(&self) -> Box<Vec<(String, Datatype)>> {
         self.columns()
     }
 }
@@ -64,14 +70,20 @@ impl Table {
             column_names,
         }));
     }
-    pub fn columns(&self) -> Box<[(String, Datatype)]> {
+    pub fn select_rows(
+        &self,
+        column_names: Box<dyn Iterator<Item = String>>,
+    ) -> Result<Iter<Value>, String> {
+        return Err("not implemented".to_string());
+    }
+    pub fn columns(&self) -> Box<Vec<(String, Datatype)>> {
         let mut columns = vec![];
         for pair in &self.column_names {
             let (column_name, i) = pair;
             columns.push((column_name.clone(), self.column_datatypes[*i].clone()));
         }
 
-        columns.into_boxed_slice()
+        Box::new(columns)
     }
     pub fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut Table, String> {
         if row.len() != self.row_len() {

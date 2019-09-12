@@ -11,7 +11,11 @@ pub trait Table {
         row: &HashMap<String, Value>,
     ) -> Result<&mut dyn Table, String>;
     fn row_len(&self) -> usize;
-    fn columns(&self) -> Box<[(String, Datatype)]>;
+    fn select_rows(
+        &self,
+        column_names: Box<dyn Iterator<Item = String>>,
+    ) -> Result<Iter<Value>, String>;
+    fn columns(&self) -> Box<Vec<(String, Datatype)>>;
 }
 
 pub trait Insertion {
@@ -19,6 +23,12 @@ pub trait Insertion {
     fn validate(&self) -> Result<(), String>;
     fn column_names(&self) -> Option<Iter<String>>;
     fn values(&self) -> Iter<Value>;
+}
+
+pub trait Selection {
+    fn table_name(&self) -> &String;
+    fn validate(&self) -> Result<(), String>;
+    fn columns(&self) -> ColumnSet;
 }
 
 pub struct Executor {
@@ -71,6 +81,34 @@ impl Executor {
             }
         }
         Ok(())
+    }
+
+    pub fn select(&self, selection: Box<dyn Selection>) -> Result<Iter<Value>, String> {
+        let table_name = selection.table_name();
+        if !self.table_exists(table_name) {
+            return Err(format!("no such table: {}", table_name));
+        }
+
+        let table = self.tables.get(table_name).unwrap();
+        let column_set = &selection.columns();
+        match column_set {
+            ColumnSet::WildCard => {
+                let columns = table.columns();
+                let column_names = columns
+                    .iter()
+                    .map(|column| column.0.clone())
+                    .collect::<Vec<String>>()
+                    .into_iter();
+                table.select_rows(Box::new(column_names))
+            }
+            ColumnSet::Names(column_names) => table.select_rows(Box::new(
+                column_names
+                    .iter()
+                    .map(|column_name| column_name.clone())
+                    .collect::<Vec<String>>()
+                    .into_iter(),
+            )),
+        }
     }
 
     fn table_exists(&self, table_name: &str) -> bool {
