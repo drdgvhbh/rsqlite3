@@ -11,7 +11,11 @@ pub trait Table {
         row: &HashMap<String, Value>,
     ) -> Result<&mut dyn Table, String>;
     fn row_len(&self) -> usize;
-    fn select_rows(&self, column_names: &Vec<String>) -> Result<Iter<Value>, String>;
+    fn select_rows(&self) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String>;
+    fn select_rows_with_named_columns(
+        &self,
+        column_names: &Vec<String>,
+    ) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String>;
     fn columns(&self) -> Box<Vec<(String, Datatype)>>;
 }
 
@@ -80,7 +84,10 @@ impl Executor {
         Ok(())
     }
 
-    pub fn select(&self, selection: Box<dyn Selection>) -> Result<Iter<Value>, String> {
+    pub fn select(
+        &self,
+        selection: Box<dyn Selection>,
+    ) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
         let table_name = selection.table_name();
         if !self.table_exists(table_name) {
             return Err(format!("no such table: {}", table_name));
@@ -89,15 +96,8 @@ impl Executor {
         let table = self.tables.get(table_name).unwrap();
         let column_set = &selection.columns();
         match column_set {
-            ColumnSet::WildCard => {
-                let columns = table.columns();
-                let column_names = columns
-                    .iter()
-                    .map(|column| column.0.clone())
-                    .collect::<Vec<String>>();
-                table.select_rows(&column_names)
-            }
-            ColumnSet::Names(column_names) => table.select_rows(&column_names),
+            ColumnSet::WildCard => table.select_rows(),
+            ColumnSet::Names(column_names) => table.select_rows_with_named_columns(&column_names),
         }
     }
 

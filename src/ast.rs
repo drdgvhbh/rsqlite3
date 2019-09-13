@@ -7,7 +7,7 @@ pub enum Ast {
     Exit,
     Create(TableSchema),
     Insert(Box<Insertion>),
-    Select(Selection),
+    Select(Box<Selection>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -20,6 +20,30 @@ pub enum ColumnSet {
 pub struct Selection {
     pub table_name: String,
     pub columns: ColumnSet,
+}
+
+impl executor::Selection for Selection {
+    fn table_name(&self) -> &String {
+        &self.table_name
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        self.validate()
+    }
+
+    fn columns(&self) -> ColumnSet {
+        self.columns()
+    }
+}
+
+impl Selection {
+    pub fn validate(&self) -> Result<(), String> {
+        return Ok(());
+    }
+
+    fn columns(&self) -> ColumnSet {
+        self.columns.clone()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

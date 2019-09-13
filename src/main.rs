@@ -67,7 +67,17 @@ fn main() {
                             print_err(&result.unwrap_err());
                         }
                     }
-                    Ast::Select(selection) => {}
+                    Ast::Select(selection) => {
+                        let result = executor.select(selection.clone());
+                        match result {
+                            Err(err) => print_err(&err),
+                            Ok(rows) => {
+                                for row in rows {
+                                    print!("{:#?}", row);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {

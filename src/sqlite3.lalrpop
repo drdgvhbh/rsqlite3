@@ -12,10 +12,11 @@ pub Ast: Ast = {
             &table_name,
             column_names,
             values)),
-    Select Star From <table_name:Identifier> Semi => Ast::Select(Selection{
-        table_name,
-        columns: ColumnSet::WildCard,
-    })
+    Select Star From <table_name:Identifier> Semi => Ast::Select(
+        Box::new(Selection{
+            table_name,
+            columns: ColumnSet::WildCard,
+    }))
 }
 
 ColumnList: Vec<Column> = {

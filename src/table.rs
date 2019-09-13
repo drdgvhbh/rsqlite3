@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::slice;
-use std::slice::Iter;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Table {
@@ -15,8 +14,14 @@ pub struct Table {
 }
 
 impl executor::Table for Table {
-    fn select_rows(&self, column_names: &Vec<String>) -> Result<Iter<Value>, String> {
-        self.select_rows(column_names)
+    fn select_rows(&self) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
+        self.select_rows()
+    }
+    fn select_rows_with_named_columns(
+        &self,
+        column_names: &Vec<String>,
+    ) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
+        self.select_rows_with_named_columns(column_names)
     }
     fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut dyn executor::Table, String> {
         self.insert_row(row)
@@ -67,8 +72,44 @@ impl Table {
             column_names,
         }));
     }
-    pub fn select_rows(&self, column_names: &Vec<String>) -> Result<Iter<Value>, String> {
-        return Err("not implemented".to_string());
+    pub fn select_rows(&self) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
+        return Ok(Box::new(
+            self.rows
+                .iter()
+                .map(|row| row.as_ref().clone())
+                .collect::<Vec<Vec<Value>>>()
+                .into_iter(),
+        ));
+    }
+    pub fn select_rows_with_named_columns(
+        &self,
+        column_names: &Vec<String>,
+    ) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
+        for column_name in column_names {
+            if self.column_names.get(column_name).is_none() {
+                return Err(format!("no such column: {}", column_name));
+            }
+        }
+        let mut indices = Vec::new();
+        let result = self.indices(&column_names, &mut indices);
+        if result.is_err() {
+            return Err(result.unwrap_err());
+        }
+
+        return Ok(Box::new(
+            self.rows
+                .iter()
+                .map(|row| {
+                    let mut filtered_row = vec![];
+                    for i in &indices {
+                        filtered_row.push(row[*i].clone());
+                    }
+
+                    filtered_row
+                })
+                .collect::<Vec<Vec<Value>>>()
+                .into_iter(),
+        ));
     }
     pub fn columns(&self) -> Box<Vec<(String, Datatype)>> {
         let mut columns = vec![];
