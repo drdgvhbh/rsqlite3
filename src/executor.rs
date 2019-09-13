@@ -11,10 +11,7 @@ pub trait Table {
         row: &HashMap<String, Value>,
     ) -> Result<&mut dyn Table, String>;
     fn row_len(&self) -> usize;
-    fn select_rows(
-        &self,
-        column_names: Box<dyn Iterator<Item = String>>,
-    ) -> Result<Iter<Value>, String>;
+    fn select_rows(&self, column_names: &Vec<String>) -> Result<Iter<Value>, String>;
     fn columns(&self) -> Box<Vec<(String, Datatype)>>;
 }
 
@@ -97,17 +94,10 @@ impl Executor {
                 let column_names = columns
                     .iter()
                     .map(|column| column.0.clone())
-                    .collect::<Vec<String>>()
-                    .into_iter();
-                table.select_rows(Box::new(column_names))
+                    .collect::<Vec<String>>();
+                table.select_rows(&column_names)
             }
-            ColumnSet::Names(column_names) => table.select_rows(Box::new(
-                column_names
-                    .iter()
-                    .map(|column_name| column_name.clone())
-                    .collect::<Vec<String>>()
-                    .into_iter(),
-            )),
+            ColumnSet::Names(column_names) => table.select_rows(&column_names),
         }
     }
 

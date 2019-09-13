@@ -15,10 +15,7 @@ pub struct Table {
 }
 
 impl executor::Table for Table {
-    fn select_rows(
-        &self,
-        column_names: Box<dyn Iterator<Item = String>>,
-    ) -> Result<Iter<Value>, String> {
+    fn select_rows(&self, column_names: &Vec<String>) -> Result<Iter<Value>, String> {
         self.select_rows(column_names)
     }
     fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut dyn executor::Table, String> {
@@ -70,10 +67,7 @@ impl Table {
             column_names,
         }));
     }
-    pub fn select_rows(
-        &self,
-        column_names: Box<dyn Iterator<Item = String>>,
-    ) -> Result<Iter<Value>, String> {
+    pub fn select_rows(&self, column_names: &Vec<String>) -> Result<Iter<Value>, String> {
         return Err("not implemented".to_string());
     }
     pub fn columns(&self) -> Box<Vec<(String, Datatype)>> {
