@@ -1,5 +1,6 @@
 use crate::executor;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::slice::Iter;
 
 #[derive(Debug, PartialEq)]
@@ -14,6 +15,21 @@ pub enum Ast {
 pub enum ColumnSet {
     WildCard,
     Names(Vec<String>),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum Value {
+    Integer(i64),
+    Null,
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            Value::Integer(i) => write!(f, "{}", i),
+            Value::Null => write!(f, "null"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -133,12 +149,6 @@ impl Insertion {
     pub fn values(&self) -> Iter<Value> {
         self.values.iter()
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum Value {
-    Integer(i64),
-    Null,
 }
 
 #[cfg(test)]
