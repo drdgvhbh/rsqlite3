@@ -73,7 +73,12 @@ fn main() {
                             Err(err) => print_err(&err),
                             Ok(rows) => {
                                 for row in rows {
-                                    print!("{:#?}", row);
+                                    for val in &row[..row.len() - 1] {
+                                        print!("{}|", val);
+                                    }
+                                    for val in &row[(row.len() - 1)..] {
+                                        print!("{}", val);
+                                    }
                                 }
                             }
                         }
