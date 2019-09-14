@@ -104,7 +104,17 @@ impl Table {
         }
 
         return Ok(Box::new(
-            self.rows.clone().into_iter().map(|row| row).into_iter(),
+            self.rows
+                .clone()
+                .into_iter()
+                .map(move |row| {
+                    let mut filtered_row = vec![];
+                    for i in &indices {
+                        filtered_row.push(row[*i].clone())
+                    }
+                    filtered_row
+                })
+                .into_iter(),
         ));
     }
     pub fn columns(&self) -> Vec<Box<dyn executor::Column>> {

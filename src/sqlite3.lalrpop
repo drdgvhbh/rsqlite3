@@ -12,10 +12,10 @@ pub Ast: Ast = {
             &table_name,
             column_names,
             values)),
-    Select Star From <table_name:Identifier> Semi => Ast::Select(
+    Select <columns:ColumnSelection> From <table_name:Identifier> Semi => Ast::Select(
         Selection{
             table_name,
-            columns: ColumnSet::WildCard,
+            columns,
     })
 }
 
@@ -32,8 +32,22 @@ Column: Column = {
     <name:Identifier> Datatype? => Column{ name }
 }
 
+ColumnSelection: ColumnSet = {
+    Star => ColumnSet::WildCard,
+    <id_list:ColumnIdentifierList> => ColumnSet::Names(id_list)
+}
+
 Datatype = {
     Integer
+}
+
+ColumnIdentifierList: Vec<String> = {
+    <a:Identifier> <b:("," Identifier)*> => {
+        let mut identifier_list = vec![a];
+        identifier_list.extend(b.iter()
+            .map(|x| x.1.clone()));
+        identifier_list
+    }
 }
 
 IdentifierList: Vec<String> = {
