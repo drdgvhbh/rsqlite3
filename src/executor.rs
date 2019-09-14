@@ -1,14 +1,16 @@
-use crate::ast::{ColumnSet, Datatype, Value};
+use crate::ast::{ColumnSet, Value};
 use std::collections::HashMap;
-use std::slice;
-use std::slice::Iter;
+
+pub trait Column {
+    fn name(&self) -> &String;
+}
 
 pub trait Table {
     fn name(&self) -> &String;
-    fn insert_row(&mut self, row: slice::Iter<Value>) -> Result<&mut dyn Table, String>;
+    fn insert_row(&mut self, row: Vec<Value>) -> Result<&mut dyn Table, String>;
     fn insert_row_with_named_columns(
         &mut self,
-        row: &HashMap<String, Value>,
+        row: HashMap<String, Value>,
     ) -> Result<&mut dyn Table, String>;
     fn row_len(&self) -> usize;
     fn select_rows(&self) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String>;
@@ -16,14 +18,14 @@ pub trait Table {
         &self,
         column_names: &Vec<String>,
     ) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String>;
-    fn columns(&self) -> Box<Vec<(String, Datatype)>>;
+    fn columns(&self) -> Vec<Box<dyn Column>>;
 }
 
 pub trait Insertion {
     fn table_name(&self) -> &String;
     fn validate(&self) -> Result<(), String>;
-    fn column_names(&self) -> Option<Iter<String>>;
-    fn values(&self) -> Iter<Value>;
+    fn column_names(&self) -> Option<Box<dyn Iterator<Item = String>>>;
+    fn values(&self) -> Box<dyn Iterator<Item = Value>>;
 }
 
 pub trait Selection {
@@ -65,7 +67,7 @@ impl Executor {
         let values = insertion.values();
 
         if insertion.column_names().is_none() {
-            let result = table.insert_row(values);
+            let result = table.insert_row(values.collect());
             if result.is_err() {
                 return result.and_then(|_| Ok(()));
             }
@@ -76,7 +78,7 @@ impl Executor {
                 let (column_name, value) = kv;
                 row.insert(column_name.clone(), value.clone());
             }
-            let result = table.insert_row_with_named_columns(&row);
+            let result = table.insert_row_with_named_columns(row);
             if result.is_err() {
                 return result.map(|_| ());
             }
@@ -134,7 +136,7 @@ mod tests {
             tables: Box::new(HashMap::new()),
         };
 
-        let result = executor.insert(new_insertion(&table_name, None, vec![]));
+        let result = executor.insert(Box::new(new_insertion(&table_name, None, vec![])));
         assert_eq!(result.is_err(), true);
     }
 }

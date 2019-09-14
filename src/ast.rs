@@ -1,14 +1,13 @@
 use crate::executor;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::slice::Iter;
 
 #[derive(Debug, PartialEq)]
 pub enum Ast {
     Exit,
     Create(TableSchema),
-    Insert(Box<Insertion>),
-    Select(Box<Selection>),
+    Insert(Insertion),
+    Select(Selection),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -63,14 +62,8 @@ impl Selection {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum Datatype {
-    Integer = 1,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Column {
-    pub name: Option<String>,
-    pub datatype: Datatype,
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -83,15 +76,15 @@ pub struct TableSchema {
 pub struct Insertion {
     pub table_name: String,
     column_names: Option<Vec<String>>,
-    values: Box<Vec<Value>>,
+    values: Vec<Value>,
 }
 
 pub fn new_insertion(
     table_name: &str,
     column_names: Option<Vec<String>>,
     values: Vec<Value>,
-) -> Box<Insertion> {
-    return Box::new(Insertion {
+) -> Insertion {
+    return Insertion {
         table_name: table_name.to_string(),
         column_names: column_names.map(|column_names| {
             column_names
@@ -99,8 +92,8 @@ pub fn new_insertion(
                 .map(|column_name| column_name.clone())
                 .collect()
         }),
-        values: Box::new(values.iter().map(|v| v.clone()).collect()),
-    });
+        values,
+    };
 }
 
 impl executor::Insertion for Insertion {
@@ -112,11 +105,11 @@ impl executor::Insertion for Insertion {
         self.validate()
     }
 
-    fn column_names(&self) -> Option<Iter<String>> {
+    fn column_names(&self) -> Option<Box<dyn Iterator<Item = String>>> {
         self.column_names()
     }
 
-    fn values(&self) -> Iter<Value> {
+    fn values(&self) -> Box<dyn Iterator<Item = Value>> {
         self.values()
     }
 }
@@ -140,14 +133,14 @@ impl Insertion {
             .map_or_else(|| Ok(()), |r| r);
     }
 
-    pub fn column_names(&self) -> Option<Iter<String>> {
-        self.column_names
-            .as_ref()
-            .and_then(|column_names| Some(column_names.iter()))
+    pub fn column_names(&self) -> Option<Box<dyn Iterator<Item = String>>> {
+        self.column_names.as_ref().and_then(|column_names| {
+            Some(Box::new(column_names.clone().into_iter()) as Box<dyn Iterator<Item = String>>)
+        })
     }
 
-    pub fn values(&self) -> Iter<Value> {
-        self.values.iter()
+    pub fn values(&self) -> Box<dyn Iterator<Item = Value>> {
+        Box::new(self.values.clone().into_iter())
     }
 }
 
@@ -188,8 +181,7 @@ mod test_parsing {
                 Ast::Create(TableSchema {
                     name: "apples".to_string(),
                     columns: vec![Column {
-                        name: Some("slices".to_string()),
-                        datatype: Datatype::Integer,
+                        name: "slices".to_string(),
                     }]
                 })
             )
