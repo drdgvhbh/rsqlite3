@@ -3,6 +3,7 @@ use rustyline::Editor;
 
 mod ast;
 mod executor;
+mod pager;
 mod sqlite3;
 mod table;
 
