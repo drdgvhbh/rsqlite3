@@ -77,7 +77,7 @@ fn main() {
                                         print!("{}|", val);
                                     }
                                     for val in &row[(row.len() - 1)..] {
-                                        print!("{}", val);
+                                        print!("{}\n", val);
                                     }
                                 }
                             }
