@@ -240,6 +240,25 @@ impl<K: Key + 'static, V: Value + 'static> Display for LeafNode<K, V> {
     }
 }
 
+impl<K: Key + 'static, V: Value + 'static> IntoIterator for LeafNode<K, V> {
+    type Item = V;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        let mut all_entries = self
+            .entries
+            .iter()
+            .map(|entry| entry.value.clone())
+            .collect::<Vec<V>>();
+        match &self.next {
+            None => {}
+            Some(next_entries) => {
+                all_entries.extend(next_entries.borrow().clone().into_iter());
+            }
+        }
+        all_entries.into_iter()
+    }
+}
+
 impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
     pub fn new(capacity: usize) -> LeafNode<K, V> {
         LeafNode::new_with_entries(Vec::with_capacity(capacity))
@@ -310,18 +329,51 @@ mod leaf_node_test {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn insertion_works() {
-        let mut leafnode = LeafNode::new(3);
-        leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
-        leafnode.insert(Entry::new(3, vec![400, 500, 600])).unwrap();
-        let other_half = leafnode
-            .insert(Entry::new(2, vec![-1, -2, -3]))
-            .unwrap()
-            .unwrap();
+    fn has_correct_iteration_order_after_insertion() {
+        let capacity = 3;
+
+        let mut leafnode = LeafNode::new(capacity);
+        assert_eq!(
+            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(2, vec![-1, -2, -3])).is_err(),
+            false
+        );
+
+        assert_eq!(
+            leafnode.into_iter().collect::<Vec<Vec<i32>>>(),
+            vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]]
+        );
+    }
+
+    #[test]
+    fn nodes_are_split_when_capacity_is_reached() {
+        let capacity = 3;
+
+        let mut leafnode = LeafNode::new(capacity);
+        assert_eq!(
+            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(2, vec![-1, -2, -3])).is_err(),
+            false
+        );
 
         assert_eq!(leafnode.entries, vec![Entry::new(1, vec![1, 2, 3]),]);
+        assert_ne!(leafnode.next, None);
         assert_eq!(
-            other_half.borrow().entries,
+            leafnode.next.unwrap().borrow().entries,
             vec![
                 Entry::new(2, vec![-1, -2, -3]),
                 Entry::new(3, vec![400, 500, 600]),
@@ -331,12 +383,20 @@ mod leaf_node_test {
 
     #[test]
     fn duplicate_insertion_fails() {
-        let mut leafnode = LeafNode::new(3);
-        leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
-        leafnode.insert(Entry::new(3, vec![400, 500, 600])).unwrap();
+        let capacity = 3;
+
+        let mut leafnode = LeafNode::new(capacity);
+        assert_eq!(
+            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
+            false
+        );
         assert_eq!(
             leafnode.insert(Entry::new(3, vec![-1, -2, -3])).is_err(),
             true
-        )
+        );
     }
 }

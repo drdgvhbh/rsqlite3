@@ -8,7 +8,7 @@ mod bp_tree_node;
 mod entry;
 
 pub trait Key = Hash + Serialize + Eq + Ord + Display + Debug + Clone + Display;
-pub trait Value = Serialize + Eq + Debug;
+pub trait Value = Serialize + Eq + Debug + Clone;
 
 pub use bp_tree::BPTree;
 pub use entry::Entry;
