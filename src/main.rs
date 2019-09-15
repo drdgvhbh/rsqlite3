@@ -1,7 +1,10 @@
+#![feature(trait_alias)]
+
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 mod ast;
+mod btree;
 mod executor;
 mod pager;
 mod sqlite3;
