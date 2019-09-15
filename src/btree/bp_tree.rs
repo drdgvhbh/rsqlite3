@@ -18,14 +18,8 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
     pub fn insert(&mut self, entry: Entry<K, V>) -> Result<(), String> {
         match &mut self.root_node {
             None => {
-                let mut new_root = LeafNode::new(self.degree);
-                match new_root.insert(entry) {
-                    Err(err) => return Err(err),
-                    Ok(_) => {
-                        self.root_node =
-                            Some(BPTreeNode::LeafNode(Rc::new(RefCell::new(new_root))));
-                    }
-                }
+                let new_root = LeafNode::new_from_entry(self.degree, entry);
+                self.root_node = Some(BPTreeNode::LeafNode(Rc::new(RefCell::new(new_root))));
             }
             Some(root_node) => match root_node.insert(entry) {
                 Err(err) => {
