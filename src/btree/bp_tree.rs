@@ -25,7 +25,7 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
                 Err(err) => {
                     return Err(err);
                 }
-                Ok(has_split_node) => match has_split_node {
+                Ok(has_node_split_into_two) => match has_node_split_into_two {
                     None => return Ok(()),
                     Some(split_node) => match (root_node, &split_node) {
                         (BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right)) => {
