@@ -56,7 +56,7 @@ mod bptree_test {
         let mut bptree = BPTree::new(3);
         bptree.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
         bptree.insert(Entry::new(3, vec![400, 500, 600])).unwrap();
-        bptree.insert(Entry::new(2, vec![-1, -2, -3]));
+        bptree.insert(Entry::new(2, vec![-1, -2, -3])).unwrap();
 
         let mut left_leaf_node = LeafNode::new(3);
         left_leaf_node.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
