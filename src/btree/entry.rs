@@ -5,16 +5,10 @@ use std::cmp::{Eq, Ord, Ordering};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-#[derive(serde::Serialize, serde::Deserialize, Eq, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Eq, Debug, Clone, PartialEq)]
 pub struct Entry<K: Key, V: Value> {
     pub key: K,
     pub value: V,
-}
-
-impl<K: Key, V: Value> PartialEq for Entry<K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
-    }
 }
 
 impl<K: Key, V: Value> PartialOrd for Entry<K, V> {

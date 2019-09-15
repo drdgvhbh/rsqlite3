@@ -137,8 +137,8 @@ mod leaf_node_test {
         assert_eq!(
             other_half.borrow().entries,
             vec![
-                Entry::new(2, vec![400, 500, 600]),
-                Entry::new(3, vec![-1, -2, -3])
+                Entry::new(2, vec![-1, -2, -3]),
+                Entry::new(3, vec![400, 500, 600]),
             ]
         );
     }
