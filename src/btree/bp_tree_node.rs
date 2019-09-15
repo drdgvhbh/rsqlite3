@@ -74,6 +74,12 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
         LeafNode::new_with_entries(Vec::with_capacity(capacity))
     }
 
+    pub fn new_from_entry(capacity: usize, entry: Entry<K, V>) -> LeafNode<K, V> {
+        let mut entries = Vec::with_capacity(capacity);
+        entries.push(entry);
+        LeafNode::new_with_entries(entries)
+    }
+
     fn new_with_entries(entries: Vec<Entry<K, V>>) -> LeafNode<K, V> {
         LeafNode {
             entries,
