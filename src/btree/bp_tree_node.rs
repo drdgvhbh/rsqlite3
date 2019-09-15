@@ -136,4 +136,15 @@ mod leaf_node_test {
             ]
         );
     }
+
+    #[test]
+    fn duplicate_insertion_fails() {
+        let mut leafnode = LeafNode::new(3);
+        leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
+        leafnode.insert(Entry::new(3, vec![400, 500, 600])).unwrap();
+        assert_eq!(
+            leafnode.insert(Entry::new(3, vec![-1, -2, -3])).is_err(),
+            true
+        )
+    }
 }
