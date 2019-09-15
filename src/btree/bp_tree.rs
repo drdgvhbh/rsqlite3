@@ -3,6 +3,7 @@ use super::{Entry, Key, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct BPTree<K: Key, V: Value> {
     pub degree: usize,
     root_node: Option<BPTreeNode<K, V>>,
@@ -22,9 +23,7 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
                 self.root_node = Some(BPTreeNode::LeafNode(Rc::new(RefCell::new(new_root))));
             }
             Some(root_node) => match root_node.insert(entry) {
-                Err(err) => {
-                    return Err(err);
-                }
+                Err(err) => return Err(err),
                 Ok(has_node_split_into_two) => match has_node_split_into_two {
                     None => return Ok(()),
                     Some(split_node) => match (root_node, &split_node) {
@@ -50,6 +49,9 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
 mod bptree_test {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    use std::fs::File;
+    use std::io::prelude::*;
 
     #[test]
     fn insertion_works() {
@@ -77,5 +79,24 @@ mod bptree_test {
                 ),
             ))))
         );
+    }
+
+    #[test]
+    fn derp() {
+        let mut bptree = BPTree::new(3);
+        bptree.insert(Entry::new(1, vec![1])).unwrap();
+        bptree.insert(Entry::new(2, vec![1])).unwrap();
+        bptree.insert(Entry::new(3, vec![1])).unwrap();
+        bptree.insert(Entry::new(4, vec![1])).unwrap();
+        bptree.insert(Entry::new(5, vec![1])).unwrap();
+        bptree.insert(Entry::new(6, vec![1])).unwrap();
+        bptree.insert(Entry::new(10, vec![1])).unwrap();
+        bptree.insert(Entry::new(11, vec![1])).unwrap();
+
+        println!("{:#?}", bptree);
+
+        let mut file = File::create("foo.txt").unwrap();
+        let swag = format!("{}", bptree.root_node.unwrap());
+        file.write_all(swag.as_bytes());
     }
 }

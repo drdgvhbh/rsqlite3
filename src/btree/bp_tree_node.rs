@@ -2,15 +2,25 @@ use super::Entry;
 use super::{Key, Value};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::cmp::Eq;
-use std::fmt::Debug;
+use std::cmp::{Eq, Ordering};
+use std::fmt;
+use std::fmt::{Debug, Display};
 
 use std::rc::Rc;
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum BPTreeNode<K: Key, V: Value> {
     LeafNode(Rc<RefCell<LeafNode<K, V>>>),
     InternalNode(Rc<RefCell<InternalNode<K, V>>>),
+}
+
+impl<K: Key + 'static, V: Value + 'static> Display for BPTreeNode<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => write!(f, "{}", leaf_node.borrow()),
+            BPTreeNode::InternalNode(internal_node) => write!(f, "{}", internal_node.borrow()),
+        }
+    }
 }
 
 impl<K: Key + 'static, V: Value + 'static> BPTreeNode<K, V> {
@@ -20,9 +30,28 @@ impl<K: Key + 'static, V: Value + 'static> BPTreeNode<K, V> {
                 .borrow_mut()
                 .insert(entry)
                 .map(|opt| opt.map(|rc| BPTreeNode::LeafNode(rc))),
-            BPTreeNode::InternalNode(internal_node) => {
-                panic!("oops");
-            }
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow_mut().insert(entry),
+        }
+    }
+
+    fn left_key(&self) -> K {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().left_key(),
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().left_key(),
+        }
+    }
+
+    fn right_key(&self) -> K {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().right_key(),
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().right_key(),
+        }
+    }
+
+    fn capacity(&self) -> usize {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().entries.capacity(),
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().entries.capacity(),
         }
     }
 }
@@ -34,8 +63,58 @@ struct InternalNodeEntry<K: Key, V: Value> {
     right: BPTreeNode<K, V>,
 }
 
+impl<K: Key, V: Value> PartialOrd for InternalNodeEntry<K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<K: Key, V: Value> Ord for InternalNodeEntry<K, V> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.key.cmp(&other.key)
+    }
+}
+
+impl<K: Key + 'static, V: Value + 'static> Display for InternalNodeEntry<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "InternalNodeEntry(key: {}, left: {}, right: {})",
+            self.key, self.left, self.right,
+        )
+    }
+}
+
 impl<K: Key + 'static, V: Value + 'static> InternalNodeEntry<K, V> {
-    fn new(key: K, node1: BPTreeNode<K, V>, node2: BPTreeNode<K, V>) {}
+    fn new(key: K, left: BPTreeNode<K, V>, right: BPTreeNode<K, V>) -> InternalNodeEntry<K, V> {
+        InternalNodeEntry { key, left, right }
+    }
+
+    pub fn insert(&mut self, entry: Entry<K, V>) -> Result<Option<BPTreeNode<K, V>>, String> {
+        if entry.key < self.key {
+            self.left.insert(entry)
+        } else {
+            self.right.insert(entry)
+        }
+    }
+
+    pub fn side(&self, key: &K) -> BPTreeNode<K, V> {
+        if key < &self.key {
+            match &self.left {
+                BPTreeNode::LeafNode(leaf_node) => BPTreeNode::LeafNode(leaf_node.clone()),
+                BPTreeNode::InternalNode(internal_node) => {
+                    BPTreeNode::InternalNode(internal_node.clone())
+                }
+            }
+        } else {
+            match &self.right {
+                BPTreeNode::LeafNode(leaf_node) => BPTreeNode::LeafNode(leaf_node.clone()),
+                BPTreeNode::InternalNode(internal_node) => {
+                    BPTreeNode::InternalNode(internal_node.clone())
+                }
+            }
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -43,23 +122,102 @@ pub struct InternalNode<K: Key, V: Value> {
     entries: Vec<InternalNodeEntry<K, V>>,
 }
 
+impl<K: Key + 'static, V: Value + 'static> Display for InternalNode<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut first = true;
+        write!(f, ",InternalNode([")?;
+        for item in &self.entries {
+            if !first {
+                write!(f, ", {}", item)?;
+            } else {
+                write!(f, "{}", item)?;
+            }
+            first = false;
+        }
+        write!(f, "])")?;
+        Ok(())
+    }
+}
+
 impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
     pub fn from_two_leaf_nodes(
         left: Rc<RefCell<LeafNode<K, V>>>,
         right: Rc<RefCell<LeafNode<K, V>>>,
     ) -> InternalNode<K, V> {
-        debug_assert!(
-            right.borrow().entries.len() > 0,
-            "right node should have entries"
-        );
-        let key = right.borrow().entries[0].key.clone();
-        let mut entries = Vec::with_capacity(right.borrow().entries.capacity());
-        entries.push(InternalNodeEntry {
-            key,
-            left: BPTreeNode::LeafNode(left),
-            right: BPTreeNode::LeafNode(right),
-        });
+        InternalNode::from_two_nodes(BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right))
+    }
+
+    fn from_two_nodes(left: BPTreeNode<K, V>, right: BPTreeNode<K, V>) -> InternalNode<K, V> {
+        debug_assert!(right.capacity() > 0, "right node should have entries");
+        let key = right.left_key();
+        let mut entries = Vec::with_capacity(right.capacity());
+        entries.push(InternalNodeEntry::new(key, left, right));
         InternalNode { entries }
+    }
+
+    fn is_full(&self) -> bool {
+        self.entries.len() >= self.entries.capacity()
+    }
+
+    fn left_key(&self) -> K {
+        let entries = &self.entries;
+        debug_assert!(
+            entries.len() > 0,
+            "internal node should have at least 1 entry"
+        );
+        return entries[0].key.clone();
+    }
+
+    fn right_key(&self) -> K {
+        let entries = &self.entries;
+        debug_assert!(
+            entries.len() > 0,
+            "internal node should have at least 1 entry"
+        );
+        return entries[entries.len() - 1].key.clone();
+    }
+
+    pub fn insert(&mut self, entry: Entry<K, V>) -> Result<Option<BPTreeNode<K, V>>, String> {
+        match self
+            .entries
+            .binary_search_by_key(&entry.key, |internal_node| internal_node.key.clone())
+        {
+            Err(index) => {
+                let mut existing_index = index;
+                if existing_index == self.entries.len() {
+                    existing_index -= 1;
+                }
+
+                let key = entry.key.clone();
+                match self.entries[existing_index].insert(entry) {
+                    Err(err) => return Err(err),
+                    Ok(has_node_split_into_two) => match has_node_split_into_two {
+                        None => {}
+                        Some(split_node) => {
+                            let new_internal_node_entry = InternalNodeEntry::new(
+                                split_node.left_key(),
+                                self.entries[existing_index].side(&key),
+                                split_node,
+                            );
+                            self.insert_node_at(new_internal_node_entry, index);
+                        }
+                    },
+                }
+                /*                 if self.is_full() {
+                    return Ok(Some(self.split()));
+                } */
+            }
+            Ok(_) => {
+                return Err(format!("duplicate entry: {}", entry.key));
+            }
+        }
+        Ok(None)
+    }
+
+    fn insert_node_at(&mut self, entry: InternalNodeEntry<K, V>, index: usize) {
+        self.entries.insert(index, entry);
+        // self.entries.insert(index, InternalNode { entries: Vec::with_capacity(self.entries.capacity())})
+        // let left = self.entries.get(index);
     }
 }
 
@@ -67,6 +225,19 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
 pub struct LeafNode<K: Key, V: Value> {
     entries: Vec<Entry<K, V>>,
     next: Option<Rc<RefCell<LeafNode<K, V>>>>,
+}
+
+impl<K: Key + 'static, V: Value + 'static> Display for LeafNode<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LeafNode({:#?})",
+            self.entries
+                .iter()
+                .map(|entry| entry.key.clone())
+                .collect::<Vec<K>>()
+        )
+    }
 }
 
 impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
@@ -115,6 +286,21 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
         new_right.next = self.next.clone();
         self.next = Some(Rc::new(RefCell::new(new_right)));
         self.next.clone().unwrap()
+    }
+
+    fn left_key(&self) -> K {
+        let entries = &self.entries;
+        debug_assert!(entries.len() > 0, "leaf node should have at least 1 entry");
+        return entries[0].key.clone();
+    }
+
+    fn right_key(&self) -> K {
+        let entries = &self.entries;
+        debug_assert!(
+            entries.len() > 0,
+            "internal node should have at least 1 entry"
+        );
+        return entries[entries.len() - 1].key.clone();
     }
 }
 
