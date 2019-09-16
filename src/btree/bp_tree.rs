@@ -45,6 +45,17 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
     }
 }
 
+impl<K: Key + 'static, V: Value + 'static> IntoIterator for BPTree<K, V> {
+    type Item = V;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        match self.root_node {
+            None => vec![].into_iter(),
+            Some(root_node) => root_node.into_iter(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod bptree_test {
     use super::*;
@@ -60,43 +71,9 @@ mod bptree_test {
         bptree.insert(Entry::new(3, vec![400, 500, 600])).unwrap();
         bptree.insert(Entry::new(2, vec![-1, -2, -3])).unwrap();
 
-        let mut left_leaf_node = LeafNode::new(3);
-        left_leaf_node.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
-        left_leaf_node
-            .insert(Entry::new(3, vec![400, 500, 600]))
-            .unwrap();
-        let right_leaf_node = left_leaf_node
-            .insert(Entry::new(2, vec![-2, -2, -3]))
-            .unwrap()
-            .unwrap();
-
         assert_eq!(
-            bptree.root_node,
-            Some(BPTreeNode::InternalNode(Rc::new(RefCell::new(
-                InternalNode::from_two_leaf_nodes(
-                    Rc::new(RefCell::new(left_leaf_node)),
-                    right_leaf_node
-                ),
-            ))))
+            bptree.into_iter().collect::<Vec<Vec<i32>>>(),
+            vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]],
         );
-    }
-
-    #[test]
-    fn derp() {
-        let mut bptree = BPTree::new(3);
-        bptree.insert(Entry::new(1, vec![1])).unwrap();
-        bptree.insert(Entry::new(2, vec![1])).unwrap();
-        bptree.insert(Entry::new(3, vec![1])).unwrap();
-        bptree.insert(Entry::new(4, vec![1])).unwrap();
-        bptree.insert(Entry::new(5, vec![1])).unwrap();
-        bptree.insert(Entry::new(6, vec![1])).unwrap();
-        bptree.insert(Entry::new(10, vec![1])).unwrap();
-        bptree.insert(Entry::new(11, vec![1])).unwrap();
-
-        println!("{:#?}", bptree);
-
-        let mut file = File::create("foo.txt").unwrap();
-        let swag = format!("{}", bptree.root_node.unwrap());
-        file.write_all(swag.as_bytes());
     }
 }
