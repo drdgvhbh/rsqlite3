@@ -176,51 +176,75 @@ mod internal_node_test {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    fn create_internal_node() -> InternalNode<i32, Vec<i32>> {
-        let capacity = 3;
-        let mut left_leafnode = LeafNode::new(capacity);
-        let mut right_leafnode = LeafNode::new(capacity);
-        left_leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
-        right_leafnode
-            .insert(Entry::new(3, vec![400, 500, 600]))
-            .unwrap();
-        right_leafnode
-            .insert(Entry::new(2, vec![-1, -2, -3]))
-            .unwrap();
-        let rc_right_node = Some(Rc::new(RefCell::new(right_leafnode)));
-        left_leafnode.next = rc_right_node.clone();
+    macro_rules! new_leaf_node {
+        ($capacity:expr, $($key:expr => $value:expr),*) => {{
+            let mut leafnode = LeafNode::<i32, Vec<i32>>::new($capacity);
+            $(assert_eq!(leafnode.insert(Entry::new($key, $value)).is_err(), false);)*
+            leafnode
+        }};
+    }
 
-        InternalNode::from_two_leaf_nodes(
-            Rc::new(RefCell::new(left_leafnode)),
-            rc_right_node.unwrap().clone(),
-        )
+    macro_rules! new_internal_node {
+        ($left:expr, $right:expr) => {{
+            let rc_right_node = Some(Rc::new(RefCell::new($right)));
+            $left.next = rc_right_node.clone();
+
+            InternalNode::from_two_leaf_nodes(
+                Rc::new(RefCell::new($left)),
+                rc_right_node.unwrap().clone(),
+            )
+        }};
+    }
+
+    macro_rules! insert {
+        ($inode:expr, $($key:expr => $value:expr),*) => {{
+            $(assert_eq!($inode.insert(Entry::new($key, $value)).is_err(), false);)*
+        }};
     }
 
     #[test]
     fn has_correct_iteration_order_after_insertion() {
+        let capacity = 3;
+
+        let mut left_node = new_leaf_node!(capacity, 1 => vec![1, 2, 3]);
+        let internal_node = new_internal_node!(
+            left_node,
+            new_leaf_node!(
+                capacity, 
+                3 => vec![400, 500, 600], 
+                2 => vec![-1, -2, -3])
+        );
         assert_eq!(
-            create_internal_node()
-                .into_iter()
-                .collect::<Vec<Vec<i32>>>(),
+            internal_node.into_iter().collect::<Vec<Vec<i32>>>(),
             vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]]
         );
     }
 
     #[test]
     fn internal_node_is_built_correctly() {
-        let mut inode = create_internal_node();
-        assert_eq!(inode.insert(Entry::new(4, vec![1])).is_err(), false);
+        let capacity = 3;
 
-        assert_eq!(inode.keys(), vec![1, 2, 2, 2, 3, 3, 4]);
+        let mut left_node = new_leaf_node!(capacity, 1 => vec![1,2,3]);
+        let mut internal_node = new_internal_node!(
+            left_node,
+            new_leaf_node!(
+                capacity, 
+                3 => vec![400, 500, 600], 
+                2 => vec![-1, -2, -3])
+        );
+        insert!(internal_node, 4 => vec![1]);
+        assert_eq!(internal_node.keys(), vec![1, 2, 2, 2, 3, 3, 4]);
     }
 
     #[test]
     fn internal_node_is_built_correctly2() {
         let capacity = 4;
-        let mut left_leafnode = LeafNode::new(capacity);
-        left_leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
-        left_leafnode.insert(Entry::new(2, vec![1, 2, 3])).unwrap();
-        left_leafnode.insert(Entry::new(3, vec![1, 2, 3])).unwrap();
+
+        let mut left_leafnode = new_leaf_node!(
+            capacity, 
+            1 => vec![1, 2, 3],
+            2 => vec![1, 2, 3],
+            3 => vec![1, 2, 3]);
         let right_leafnode = left_leafnode
             .insert(Entry::new(4, vec![1, 2, 3]))
             .unwrap()
@@ -229,21 +253,23 @@ mod internal_node_test {
         let rc_right_node = Some(right_leafnode);
         left_leafnode.next = rc_right_node.clone();
 
-        let inode = InternalNode::from_two_leaf_nodes(
+        let internal_node = InternalNode::from_two_leaf_nodes(
             Rc::new(RefCell::new(left_leafnode)),
             rc_right_node.unwrap().clone(),
         );
 
-        assert_eq!(inode.keys(), vec![1, 2, 3, 3, 4]);
+        assert_eq!(internal_node.keys(), vec![1, 2, 3, 3, 4]);
     }
 
     #[test]
     fn internal_node_is_built_correctly3() {
         let capacity = 4;
-        let mut left_leafnode = LeafNode::new(capacity);
-        left_leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
-        left_leafnode.insert(Entry::new(2, vec![1, 2, 3])).unwrap();
-        left_leafnode.insert(Entry::new(3, vec![1, 2, 3])).unwrap();
+
+        let mut left_leafnode = new_leaf_node!(
+            capacity, 
+            1 => vec![1, 2, 3],
+            2 => vec![1, 2, 3],
+            3 => vec![1, 2, 3]);
         let right_leafnode = left_leafnode
             .insert(Entry::new(4, vec![1, 2, 3]))
             .unwrap()
@@ -252,20 +278,20 @@ mod internal_node_test {
         let rc_right_node = Some(right_leafnode);
         left_leafnode.next = rc_right_node.clone();
 
-        let mut inode = InternalNode::from_two_leaf_nodes(
+        let mut internal_node = InternalNode::from_two_leaf_nodes(
             Rc::new(RefCell::new(left_leafnode)),
             rc_right_node.unwrap().clone(),
         );
-        assert_eq!(inode.insert(Entry::new(10, vec![1])).is_err(), false);
-        assert_eq!(inode.insert(Entry::new(11, vec![1])).is_err(), false);
-        assert_eq!(inode.insert(Entry::new(5, vec![1])).is_err(), false);
-        assert_eq!(inode.insert(Entry::new(6, vec![1])).is_err(), false);
-        assert_eq!(inode.insert(Entry::new(20, vec![1])).is_err(), false);
 
-        println!("{}", inode);
-
+        insert!(internal_node,
+            10 => vec![1],
+            11 => vec![1],
+            5 => vec![1],
+            6 => vec![1],
+            20 => vec![1]
+        );
         assert_eq!(
-            inode.keys(),
+            internal_node.keys(),
             vec![1, 2, 3, 3, 4, 3, 4, 5, 5, 6, 5, 6, 10, 10, 11, 20]
         );
     }
