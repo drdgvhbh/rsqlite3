@@ -34,18 +34,18 @@ pub trait Selection {
     fn columns(&self) -> ColumnSet;
 }
 
-pub struct Executor {
-    tables: Box<HashMap<String, Box<dyn Table>>>,
+pub struct Executor<T: Table> {
+    tables: HashMap<String, T>,
 }
 
-impl Executor {
-    pub fn new() -> Box<Executor> {
-        return Box::new(Executor {
-            tables: Box::new(HashMap::new()),
-        });
+impl<T: Table> Executor<T> {
+    pub fn new() -> Executor<T> {
+        return Executor {
+            tables: HashMap::new(),
+        };
     }
 
-    pub fn add_table(&mut self, table: Box<dyn Table>) -> Result<(), String> {
+    pub fn add_table(&mut self, table: T) -> Result<(), String> {
         let table_name = table.name();
         if self.table_exists(&table_name) {
             return Err(format!("table {} already exists", &table_name).to_string());
@@ -54,7 +54,7 @@ impl Executor {
         Ok(())
     }
 
-    pub fn insert(&mut self, insertion: Box<dyn Insertion>) -> Result<(), String> {
+    pub fn insert<I: Insertion>(&mut self, insertion: I) -> Result<(), String> {
         let table_name = insertion.table_name();
         if !self.table_exists(table_name) {
             return Err(format!("no such table: {}", table_name));
@@ -86,9 +86,9 @@ impl Executor {
         Ok(())
     }
 
-    pub fn select(
+    pub fn select<S: Selection>(
         &self,
-        selection: Box<dyn Selection>,
+        selection: S,
     ) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
         let table_name = selection.table_name();
         if !self.table_exists(table_name) {
@@ -111,14 +111,14 @@ impl Executor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::*;
+    use crate::ast;
     use crate::table;
     use std::collections::HashMap;
 
     #[test]
     fn should_fail_to_create_a_table_if_one_with_same_name_already_exists() {
         let table_name = "apples";
-        let mut tables: Box<HashMap<String, Box<dyn Table>>> = Box::new(HashMap::new());
+        let mut tables: HashMap<String, table::Table> = HashMap::new();
         tables.insert(
             table_name.to_string(),
             table::Table::new(table_name, vec![].iter()).unwrap(),
@@ -132,11 +132,11 @@ mod tests {
     #[test]
     fn should_fail_to_insert_row_if_table_does_not_exist() {
         let table_name = "oranges".to_string();
-        let mut executor = Executor {
-            tables: Box::new(HashMap::new()),
+        let mut executor = Executor::<table::Table> {
+            tables: HashMap::new(),
         };
 
-        let result = executor.insert(Box::new(new_insertion(&table_name, None, vec![])));
+        let result = executor.insert(ast::Insertion::new(&table_name, None, vec![]));
         assert_eq!(result.is_err(), true);
     }
 }

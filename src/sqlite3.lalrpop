@@ -1,4 +1,4 @@
-use crate::ast::{ Ast, TableSchema, Column, Value, Selection, ColumnSet, new_insertion };
+use crate::ast::{ Ast, TableSchema, Column, Value, Selection, ColumnSet, Insertion };
 
 grammar;
 
@@ -8,7 +8,7 @@ pub Ast: Ast = {
         => Ast::Create(TableSchema{ name, columns }),
     Insert Into <table_name:Identifier> <column_names:IdentifierList?>
         Values <values:ValueList> Semi
-        => Ast::Insert(new_insertion(
+        => Ast::Insert(Insertion::new(
             &table_name,
             column_names,
             values)),

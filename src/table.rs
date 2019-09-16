@@ -61,7 +61,7 @@ impl executor::Table for Table {
 }
 
 impl Table {
-    pub fn new<'a, I>(table_name: &str, iterator: I) -> Result<Box<Table>, String>
+    pub fn new<'a, I>(table_name: &str, iterator: I) -> Result<Table, String>
     where
         I: IntoIterator<Item = &'a Column>,
     {
@@ -79,11 +79,11 @@ impl Table {
                 },
             );
         }
-        return Ok(Box::new(Table {
+        return Ok(Table {
             name: table_name.to_lowercase(),
             rows: vec![],
             columns: verified_columns,
-        }));
+        });
     }
     pub fn select_rows(&self) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
         return Ok(Box::new(self.rows.clone().into_iter()));

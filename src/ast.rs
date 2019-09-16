@@ -79,23 +79,6 @@ pub struct Insertion {
     values: Vec<Value>,
 }
 
-pub fn new_insertion(
-    table_name: &str,
-    column_names: Option<Vec<String>>,
-    values: Vec<Value>,
-) -> Insertion {
-    return Insertion {
-        table_name: table_name.to_string(),
-        column_names: column_names.map(|column_names| {
-            column_names
-                .iter()
-                .map(|column_name| column_name.clone())
-                .collect()
-        }),
-        values,
-    };
-}
-
 impl executor::Insertion for Insertion {
     fn table_name(&self) -> &String {
         &self.table_name
@@ -115,6 +98,22 @@ impl executor::Insertion for Insertion {
 }
 
 impl Insertion {
+    pub fn new(
+        table_name: &str,
+        column_names: Option<Vec<String>>,
+        values: Vec<Value>,
+    ) -> Insertion {
+        return Insertion {
+            table_name: table_name.to_string(),
+            column_names: column_names.map(|column_names| {
+                column_names
+                    .iter()
+                    .map(|column_name| column_name.clone())
+                    .collect()
+            }),
+            values,
+        };
+    }
     pub fn validate(&self) -> Result<(), String> {
         return self
             .column_names
@@ -159,7 +158,7 @@ mod test_parsing {
             let insert_stmt = parse_result.unwrap();
             assert_eq!(
                 insert_stmt,
-                Ast::Insert(new_insertion(
+                Ast::Insert(Insertion::new(
                     "apples",
                     Some(vec!["slices".to_string()]),
                     vec![Value::Integer(15)],
@@ -196,7 +195,7 @@ mod test_insertion {
     #[test]
     fn validation_fails_if_num_values_neq_num_columns() {
         let table_name = "eggs";
-        let insertion = new_insertion(
+        let insertion = Insertion::new(
             table_name,
             Some(vec!["count".to_string()]),
             vec![Value::Integer(32), Value::Integer(1337)],
