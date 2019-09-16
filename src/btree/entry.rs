@@ -1,9 +1,7 @@
 use super::{Key, Value};
 use serde;
-use serde::ser::Serialize;
 use std::cmp::{Eq, Ord, Ordering};
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
+use std::fmt::Debug;
 
 #[derive(serde::Serialize, serde::Deserialize, Eq, Debug, Clone, PartialEq)]
 pub struct Entry<K: Key, V: Value> {
