@@ -33,8 +33,8 @@ impl fmt::Display for Value {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Selection {
-    pub table_name: String,
-    pub columns: ColumnSet,
+    table_name: String,
+    columns: ColumnSet,
 }
 
 impl executor::Selection for Selection {
@@ -52,6 +52,12 @@ impl executor::Selection for Selection {
 }
 
 impl Selection {
+    pub fn new(table_name: &str, columns: ColumnSet) -> Selection {
+        Selection {
+            table_name: table_name.to_string(),
+            columns,
+        }
+    }
     pub fn validate(&self) -> Result<(), String> {
         return Ok(());
     }

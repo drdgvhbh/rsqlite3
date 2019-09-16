@@ -13,10 +13,11 @@ pub Ast: Ast = {
             column_names,
             values)),
     Select <columns:ColumnSelection> From <table_name:Identifier> Semi => Ast::Select(
-        Selection{
-            table_name,
+        Selection::new(
+            &table_name,
             columns,
-    })
+        )
+    )
 }
 
 ColumnList: Vec<Column> = {
