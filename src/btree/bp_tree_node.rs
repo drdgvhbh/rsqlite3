@@ -14,6 +14,17 @@ pub enum BPTreeNode<K: Key, V: Value> {
     InternalNode(Rc<RefCell<InternalNode<K, V>>>),
 }
 
+impl<K: Key + 'static, V: Value + 'static> IntoIterator for BPTreeNode<K, V> {
+    type Item = V;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().clone().into_iter(),
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().clone().into_iter(),
+        }
+    }
+}
+
 impl<K: Key + 'static, V: Value + 'static> Display for BPTreeNode<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
@@ -61,6 +72,14 @@ struct InternalNodeEntry<K: Key, V: Value> {
     key: K,
     left: BPTreeNode<K, V>,
     right: BPTreeNode<K, V>,
+}
+
+impl<K: Key + 'static, V: Value + 'static> IntoIterator for InternalNodeEntry<K, V> {
+    type Item = V;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.left.into_iter()
+    }
 }
 
 impl<K: Key, V: Value> PartialOrd for InternalNodeEntry<K, V> {
@@ -120,6 +139,15 @@ impl<K: Key + 'static, V: Value + 'static> InternalNodeEntry<K, V> {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct InternalNode<K: Key, V: Value> {
     entries: Vec<InternalNodeEntry<K, V>>,
+}
+
+impl<K: Key + 'static, V: Value + 'static> IntoIterator for InternalNode<K, V> {
+    type Item = V;
+    type IntoIter = ::std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        debug_assert!(!self.entries.is_empty(), "internal node must have entries");
+        self.entries[0].clone().into_iter()
+    }
 }
 
 impl<K: Key + 'static, V: Value + 'static> Display for InternalNode<K, V> {
@@ -328,8 +356,7 @@ mod leaf_node_test {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    #[test]
-    fn has_correct_iteration_order_after_insertion() {
+    fn create_leaf_node() -> LeafNode<i32, Vec<i32>> {
         let capacity = 3;
 
         let mut leafnode = LeafNode::new(capacity);
@@ -346,30 +373,20 @@ mod leaf_node_test {
             false
         );
 
+        leafnode
+    }
+
+    #[test]
+    fn has_correct_iteration_order_after_insertion() {
         assert_eq!(
-            leafnode.into_iter().collect::<Vec<Vec<i32>>>(),
+            create_leaf_node().into_iter().collect::<Vec<Vec<i32>>>(),
             vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]]
         );
     }
 
     #[test]
     fn nodes_are_split_when_capacity_is_reached() {
-        let capacity = 3;
-
-        let mut leafnode = LeafNode::new(capacity);
-        assert_eq!(
-            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(2, vec![-1, -2, -3])).is_err(),
-            false
-        );
-
+        let leafnode = create_leaf_node();
         assert_eq!(leafnode.entries, vec![Entry::new(1, vec![1, 2, 3]),]);
         assert_ne!(leafnode.next, None);
         assert_eq!(
@@ -397,6 +414,42 @@ mod leaf_node_test {
         assert_eq!(
             leafnode.insert(Entry::new(3, vec![-1, -2, -3])).is_err(),
             true
+        );
+    }
+}
+
+#[cfg(test)]
+mod internal_node_test {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn create_internal_node() -> InternalNode<i32, Vec<i32>> {
+        let capacity = 3;
+        let mut left_leafnode = LeafNode::new(capacity);
+        let mut right_leafnode = LeafNode::new(capacity);
+        left_leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
+        right_leafnode
+            .insert(Entry::new(3, vec![400, 500, 600]))
+            .unwrap();
+        right_leafnode
+            .insert(Entry::new(2, vec![-1, -2, -3]))
+            .unwrap();
+        let rc_right_node = Some(Rc::new(RefCell::new(right_leafnode)));
+        left_leafnode.next = rc_right_node.clone();
+
+        InternalNode::from_two_leaf_nodes(
+            Rc::new(RefCell::new(left_leafnode)),
+            rc_right_node.unwrap().clone(),
+        )
+    }
+
+    #[test]
+    fn has_correct_iteration_order_after_insertion() {
+        assert_eq!(
+            create_internal_node()
+                .into_iter()
+                .collect::<Vec<Vec<i32>>>(),
+            vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]]
         );
     }
 }
