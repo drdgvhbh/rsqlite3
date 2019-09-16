@@ -4,7 +4,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 mod ast;
-mod btree;
+mod bptree;
 mod executor;
 mod pager;
 mod sqlite3;
