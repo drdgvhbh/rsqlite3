@@ -33,6 +33,12 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
                             self.root_node =
                                 Some(BPTreeNode::InternalNode(Rc::new(RefCell::new(new_root))));
                         }
+                        (BPTreeNode::InternalNode(left), BPTreeNode::InternalNode(right)) => {
+                            let new_root =
+                                InternalNode::from_two_internal_nodes(left.clone(), right.clone());
+                            self.root_node =
+                                Some(BPTreeNode::InternalNode(Rc::new(RefCell::new(new_root))));
+                        }
                         _ => {
                             debug_assert!(false, "oops");
                         }
@@ -42,6 +48,18 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
         }
 
         Ok(())
+    }
+
+    /// Returns a depth-first traversal of the keys in the tree.
+    ///
+    /// Will have duplicates and this function is solely for testing
+    /// the construction of the tree.
+    #[allow(dead_code)]
+    fn keys(&mut self) -> Vec<K> {
+        match &self.root_node {
+            None => vec![],
+            Some(root_node) => root_node.keys(),
+        }
     }
 }
 
@@ -61,9 +79,6 @@ mod bptree_test {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    use std::fs::File;
-    use std::io::prelude::*;
-
     #[test]
     fn insertion_works() {
         let mut bptree = BPTree::new(3);
@@ -74,6 +89,28 @@ mod bptree_test {
         assert_eq!(
             bptree.into_iter().collect::<Vec<Vec<i32>>>(),
             vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]],
+        );
+    }
+
+    #[test]
+    fn tree_is_built_correctly() {
+        let mut bptree = BPTree::new(4);
+        assert_eq!(bptree.insert(Entry::new(1, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(2, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(3, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(4, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(10, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(11, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(5, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(6, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(20, vec![1])).is_err(), false);
+        assert_eq!(bptree.insert(Entry::new(30, vec![1])).is_err(), false);
+
+        println!("{}", bptree.root_node.clone().unwrap());
+
+        assert_eq!(
+            bptree.keys(),
+            vec![1, 2, 3, 3, 4, 3, 4, 5, 5, 6, 10, 10, 11, 20, 20, 30]
         );
     }
 }

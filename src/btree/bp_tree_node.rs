@@ -65,6 +65,20 @@ impl<K: Key + 'static, V: Value + 'static> BPTreeNode<K, V> {
             BPTreeNode::InternalNode(internal_node) => internal_node.borrow().entries.capacity(),
         }
     }
+
+    fn len(&self) -> usize {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().entries.len(),
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().entries.len(),
+        }
+    }
+
+    pub fn keys(&self) -> Vec<K> {
+        match &self {
+            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().keys(),
+            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().keys(),
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -134,6 +148,14 @@ impl<K: Key + 'static, V: Value + 'static> InternalNodeEntry<K, V> {
             }
         }
     }
+
+    pub fn keys(&self) -> Vec<K> {
+        let mut keys = self.left.keys();
+        keys.push(self.key.clone());
+        keys.extend(self.right.keys());
+
+        keys
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -175,11 +197,36 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
         InternalNode::from_two_nodes(BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right))
     }
 
+    pub fn from_two_internal_nodes(
+        left: Rc<RefCell<InternalNode<K, V>>>,
+        right: Rc<RefCell<InternalNode<K, V>>>,
+    ) -> InternalNode<K, V> {
+        debug_assert!(
+            right.borrow().entries.len() > 0,
+            "right node should have entries"
+        );
+        let key = right.borrow().left_key();
+        let mut entries = Vec::with_capacity(right.borrow().entries.capacity());
+        let new_right = Rc::new(RefCell::new(InternalNode::new_with_entries(
+            right.borrow().entries.clone()[1..].to_vec(),
+        )));
+        entries.push(InternalNodeEntry::new(
+            key,
+            BPTreeNode::InternalNode(left),
+            BPTreeNode::InternalNode(new_right),
+        ));
+        InternalNode { entries }
+    }
+
     fn from_two_nodes(left: BPTreeNode<K, V>, right: BPTreeNode<K, V>) -> InternalNode<K, V> {
-        debug_assert!(right.capacity() > 0, "right node should have entries");
+        debug_assert!(right.len() > 0, "right node should have entries");
         let key = right.left_key();
         let mut entries = Vec::with_capacity(right.capacity());
         entries.push(InternalNodeEntry::new(key, left, right));
+        InternalNode { entries }
+    }
+
+    fn new_with_entries(entries: Vec<InternalNodeEntry<K, V>>) -> InternalNode<K, V> {
         InternalNode { entries }
     }
 
@@ -231,9 +278,9 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
                         }
                     },
                 }
-                /*                 if self.is_full() {
-                    return Ok(Some(self.split()));
-                } */
+                if self.is_full() {
+                    return Ok(Some(BPTreeNode::InternalNode(self.split())));
+                }
             }
             Ok(_) => {
                 return Err(format!("duplicate entry: {}", entry.key));
@@ -242,10 +289,40 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
         Ok(None)
     }
 
+    fn split(&mut self) -> Rc<RefCell<InternalNode<K, V>>> {
+        let mid_index = self.entries.len() / 2;
+        let right_split = self.entries.split_off(mid_index);
+        let mut split_with_correct_alloc = Vec::with_capacity(self.entries.capacity());
+        split_with_correct_alloc.extend(right_split);
+        let new_right = InternalNode::new_with_entries(split_with_correct_alloc);
+        Rc::new(RefCell::new(new_right))
+    }
+
     fn insert_node_at(&mut self, entry: InternalNodeEntry<K, V>, index: usize) {
+        let entry_clone = entry.clone();
         self.entries.insert(index, entry);
-        // self.entries.insert(index, InternalNode { entries: Vec::with_capacity(self.entries.capacity())})
-        // let left = self.entries.get(index);
+
+        match self.entries.get_mut(index - 1) {
+            None => {}
+            Some(left) => {
+                left.right = entry_clone.left.clone();
+            }
+        }
+        match self.entries.get_mut(index + 1) {
+            None => {}
+            Some(right) => {
+                right.left = entry_clone.right.clone();
+            }
+        }
+    }
+
+    pub fn keys(&self) -> Vec<K> {
+        let mut keys = vec![];
+        for entry in &self.entries {
+            keys.extend(entry.keys());
+        }
+
+        keys
     }
 }
 
@@ -329,7 +406,10 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
 
     fn split(&mut self) -> Rc<RefCell<LeafNode<K, V>>> {
         let mid_index = self.entries.len() / 2;
-        let mut new_right = LeafNode::new_with_entries(self.entries.split_off(mid_index));
+        let right_split = self.entries.split_off(mid_index);
+        let mut split_with_correct_alloc = Vec::with_capacity(self.entries.capacity());
+        split_with_correct_alloc.extend(right_split);
+        let mut new_right = LeafNode::new_with_entries(split_with_correct_alloc);
         new_right.next = self.next.clone();
         self.next = Some(Rc::new(RefCell::new(new_right)));
         self.next.clone().unwrap()
@@ -348,6 +428,13 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
             "internal node should have at least 1 entry"
         );
         return entries[entries.len() - 1].key.clone();
+    }
+
+    pub fn keys(&self) -> Vec<K> {
+        self.entries
+            .iter()
+            .map(|entry| entry.key.clone())
+            .collect::<Vec<K>>()
     }
 }
 
@@ -376,6 +463,30 @@ mod leaf_node_test {
         leafnode
     }
 
+    fn create_leaf_node_cap4() -> LeafNode<i32, Vec<i32>> {
+        let capacity = 4;
+
+        let mut leafnode = LeafNode::new(capacity);
+        assert_eq!(
+            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(2, vec![-1, -2, -3])).is_err(),
+            false
+        );
+        assert_eq!(
+            leafnode.insert(Entry::new(4, vec![-1, -2, -3])).is_err(),
+            false
+        );
+
+        leafnode
+    }
+
     #[test]
     fn has_correct_iteration_order_after_insertion() {
         assert_eq!(
@@ -394,6 +505,26 @@ mod leaf_node_test {
             vec![
                 Entry::new(2, vec![-1, -2, -3]),
                 Entry::new(3, vec![400, 500, 600]),
+            ]
+        );
+    }
+
+    #[test]
+    fn nodes_are_split_when_capacity_is_reached2() {
+        let leafnode = create_leaf_node_cap4();
+        assert_eq!(
+            leafnode.entries,
+            vec![
+                Entry::new(1, vec![1, 2, 3]),
+                Entry::new(2, vec![-1, -2, -3])
+            ]
+        );
+        assert_ne!(leafnode.next, None);
+        assert_eq!(
+            leafnode.next.unwrap().borrow().entries,
+            vec![
+                Entry::new(3, vec![400, 500, 600]),
+                Entry::new(4, vec![-1, -2, -3]),
             ]
         );
     }
@@ -450,6 +581,70 @@ mod internal_node_test {
                 .into_iter()
                 .collect::<Vec<Vec<i32>>>(),
             vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]]
+        );
+    }
+
+    #[test]
+    fn internal_node_is_built_correctly() {
+        let mut inode = create_internal_node();
+        assert_eq!(inode.insert(Entry::new(4, vec![1])).is_err(), false);
+
+        assert_eq!(inode.keys(), vec![1, 2, 2, 2, 3, 3, 4]);
+    }
+
+    #[test]
+    fn internal_node_is_built_correctly2() {
+        let capacity = 4;
+        let mut left_leafnode = LeafNode::new(capacity);
+        left_leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
+        left_leafnode.insert(Entry::new(2, vec![1, 2, 3])).unwrap();
+        left_leafnode.insert(Entry::new(3, vec![1, 2, 3])).unwrap();
+        let right_leafnode = left_leafnode
+            .insert(Entry::new(4, vec![1, 2, 3]))
+            .unwrap()
+            .unwrap();
+
+        let rc_right_node = Some(right_leafnode);
+        left_leafnode.next = rc_right_node.clone();
+
+        let inode = InternalNode::from_two_leaf_nodes(
+            Rc::new(RefCell::new(left_leafnode)),
+            rc_right_node.unwrap().clone(),
+        );
+
+        assert_eq!(inode.keys(), vec![1, 2, 3, 3, 4]);
+    }
+
+    #[test]
+    fn internal_node_is_built_correctly3() {
+        let capacity = 4;
+        let mut left_leafnode = LeafNode::new(capacity);
+        left_leafnode.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
+        left_leafnode.insert(Entry::new(2, vec![1, 2, 3])).unwrap();
+        left_leafnode.insert(Entry::new(3, vec![1, 2, 3])).unwrap();
+        let right_leafnode = left_leafnode
+            .insert(Entry::new(4, vec![1, 2, 3]))
+            .unwrap()
+            .unwrap();
+
+        let rc_right_node = Some(right_leafnode);
+        left_leafnode.next = rc_right_node.clone();
+
+        let mut inode = InternalNode::from_two_leaf_nodes(
+            Rc::new(RefCell::new(left_leafnode)),
+            rc_right_node.unwrap().clone(),
+        );
+        assert_eq!(inode.insert(Entry::new(10, vec![1])).is_err(), false);
+        assert_eq!(inode.insert(Entry::new(11, vec![1])).is_err(), false);
+        assert_eq!(inode.insert(Entry::new(5, vec![1])).is_err(), false);
+        assert_eq!(inode.insert(Entry::new(6, vec![1])).is_err(), false);
+        assert_eq!(inode.insert(Entry::new(20, vec![1])).is_err(), false);
+
+        println!("{}", inode);
+
+        assert_eq!(
+            inode.keys(),
+            vec![1, 2, 3, 3, 4, 3, 4, 5, 5, 6, 5, 6, 10, 10, 11, 20]
         );
     }
 }
