@@ -117,61 +117,39 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    fn create_leaf_node() -> LeafNode<i32, Vec<i32>> {
-        let capacity = 3;
-
-        let mut leafnode = LeafNode::new(capacity);
-        assert_eq!(
-            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(2, vec![-1, -2, -3])).is_err(),
-            false
-        );
-
-        leafnode
-    }
-
-    fn create_leaf_node_cap4() -> LeafNode<i32, Vec<i32>> {
-        let capacity = 4;
-
-        let mut leafnode = LeafNode::new(capacity);
-        assert_eq!(
-            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(2, vec![-1, -2, -3])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(4, vec![-1, -2, -3])).is_err(),
-            false
-        );
-
-        leafnode
+    macro_rules! new_leaf_node {
+        ($capacity:expr, $($key:expr => $value:expr),*) => {{
+            let mut leafnode = LeafNode::<i32, Vec<i32>>::new($capacity);
+            $(assert_eq!(leafnode.insert(Entry::new($key, $value)).is_err(), false);)*
+            leafnode
+        }};
     }
 
     #[test]
     fn has_correct_iteration_order_after_insertion() {
+        let capacity = 3;
+
+        let leafnode = new_leaf_node!(
+            capacity, 
+            1 => vec![1,2,3], 
+            3 => vec![400, 500, 600], 
+            2 => vec![-1, -2, -3]);
+
         assert_eq!(
-            create_leaf_node().into_iter().collect::<Vec<Vec<i32>>>(),
+            leafnode.into_iter().collect::<Vec<Vec<i32>>>(),
             vec![vec![1, 2, 3], vec![-1, -2, -3], vec![400, 500, 600]]
         );
     }
 
     #[test]
     fn nodes_are_split_when_capacity_is_reached() {
-        let leafnode = create_leaf_node();
+        let capacity = 3;
+
+        let leafnode = new_leaf_node!(
+            capacity, 
+            1 => vec![1,2,3], 
+            3 => vec![400, 500, 600], 
+            2 => vec![-1, -2, -3]);
         assert_eq!(leafnode.entries, vec![Entry::new(1, vec![1, 2, 3]),]);
         assert_ne!(leafnode.next, None);
         assert_eq!(
@@ -185,7 +163,15 @@ mod tests {
 
     #[test]
     fn nodes_are_split_when_capacity_is_reached2() {
-        let leafnode = create_leaf_node_cap4();
+        let capacity = 4;
+
+        let leafnode = new_leaf_node!(
+            capacity,
+            1 => vec![1,2,3],
+            3 => vec![400, 500, 600],
+            2 => vec![-1, -2, -3],
+            4 => vec![-1, -2, -3]
+        );
         assert_eq!(
             leafnode.entries,
             vec![
@@ -206,16 +192,10 @@ mod tests {
     #[test]
     fn duplicate_insertion_fails() {
         let capacity = 3;
-
-        let mut leafnode = LeafNode::new(capacity);
-        assert_eq!(
-            leafnode.insert(Entry::new(1, vec![1, 2, 3])).is_err(),
-            false
-        );
-        assert_eq!(
-            leafnode.insert(Entry::new(3, vec![400, 500, 600])).is_err(),
-            false
-        );
+        let mut leafnode = new_leaf_node!(
+            capacity, 
+            1 => vec![1,2,3], 
+            3 => vec![400, 500, 600]);
         assert_eq!(
             leafnode.insert(Entry::new(3, vec![-1, -2, -3])).is_err(),
             true
