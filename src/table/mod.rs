@@ -34,6 +34,7 @@ pub struct Table<T: BPTree> {
     pub name: String,
     rows: T,
     columns: HashMap<String, IndexedColumn>,
+    pk_idx: usize,
 }
 
 impl<T: BPTree + 'static> executor::Table for Table<T> {
@@ -87,9 +88,14 @@ impl<T: BPTree + 'static> Table<T> {
         table_schema.validate()?;
         let columns = table_schema.columns();
         let table_name = table_schema.table_name();
+        let mut pk_idx = 0;
 
         let mut mapped_columns = HashMap::new();
         for (i, column) in columns.into_iter().enumerate() {
+            if column.is_primary_key {
+                pk_idx = i;
+            }
+
             mapped_columns.insert(
                 column.name.clone(),
                 IndexedColumn {
@@ -101,6 +107,7 @@ impl<T: BPTree + 'static> Table<T> {
         return Ok(Table {
             name: table_name.to_lowercase(),
             rows,
+            pk_idx,
             columns: mapped_columns,
         });
     }
@@ -150,7 +157,7 @@ impl<T: BPTree + 'static> Table<T> {
             return Err(self.wrong_num_of_columns_error(row.len()));
         }
 
-        self.rows.insert(row[0].clone(), row)?;
+        self.rows.insert(row[self.pk_idx].clone(), row)?;
 
         Ok(self)
     }
@@ -176,7 +183,7 @@ impl<T: BPTree + 'static> Table<T> {
             row_vec[*index] = value.clone();
         }
 
-        self.rows.insert(row_vec[0].clone(), row_vec)?;
+        self.rows.insert(row_vec[self.pk_idx].clone(), row_vec)?;
 
         Ok(self)
     }
