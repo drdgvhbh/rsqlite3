@@ -127,9 +127,19 @@ impl table::TableSchema for TableSchema {
 
     fn validate(&self) -> Result<(), String> {
         let mut column_names = HashSet::new();
+        let mut has_primary_key = false;
         for c in &self.columns {
             if column_names.contains(&c.name) {
                 return Err(format!("duplicate column name: {}", c.name));
+            }
+            if has_primary_key {
+                return Err(format!(
+                    "table \"{}\" has more than one primary key",
+                    self.name
+                ));
+            }
+            if c.is_primary_key {
+                has_primary_key = true
             }
             column_names.insert(c.name.clone());
         }
@@ -278,6 +288,17 @@ mod test_table_schema {
         let table_schema = super::TableSchema::new(
             "kings",
             vec![Column::new("henry", false), Column::new("henry", false)],
+        );
+
+        let result = table_schema.validate();
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn validation_fails_if_there_are_duplicate_primary_keys() {
+        let table_schema = super::TableSchema::new(
+            "kings",
+            vec![Column::new("henry", true), Column::new("james", true)],
         );
 
         let result = table_schema.validate();
