@@ -227,15 +227,7 @@ mod tests {
     fn new_tables_should_not_have_duplicate_column_names() {
         let result = Table::new(
             "animals",
-            vec![
-                Column {
-                    name: "feet".to_string(),
-                },
-                Column {
-                    name: "feet".to_string(),
-                },
-            ]
-            .iter(),
+            vec![Column::new("feet", false), Column::new("feet", false)].iter(),
             MockBpTree::new(),
         );
         assert_eq!(result.is_err(), true);
@@ -245,15 +237,7 @@ mod tests {
     fn rows_with_wrong_column_size_should_fail_to_be_inserted() {
         let mut table = Table::new(
             "animals",
-            vec![
-                Column {
-                    name: "feet".to_string(),
-                },
-                Column {
-                    name: "eyes".to_string(),
-                },
-            ]
-            .iter(),
+            vec![Column::new("feet", false), Column::new("eyes", false)].iter(),
             MockBpTree::new(),
         )
         .unwrap();
@@ -272,10 +256,7 @@ mod tests {
     fn rows_with_extraneous_column_name_should_fail_to_be_inserted() {
         let mut table = Table::new(
             "animals",
-            vec![Column {
-                name: "feet".to_string(),
-            }]
-            .iter(),
+            vec![Column::new("feet", false)].iter(),
             MockBpTree::new(),
         )
         .unwrap();

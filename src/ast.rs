@@ -88,6 +88,16 @@ impl Selection {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Column {
     pub name: String,
+    pub is_primary_key: bool,
+}
+
+impl Column {
+    pub fn new(name: &str, is_primary_key: bool) -> Column {
+        Column {
+            name: name.to_string(),
+            is_primary_key,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -203,9 +213,7 @@ mod test_parsing {
                 insert_stmt,
                 Ast::Create(TableSchema {
                     name: "apples".to_string(),
-                    columns: vec![Column {
-                        name: "slices".to_string(),
-                    }]
+                    columns: vec![Column::new("slices", false)]
                 })
             )
         }
