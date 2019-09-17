@@ -3,7 +3,7 @@ use super::{Entry, Key, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BPTree<K: Key, V: Value> {
     pub degree: usize,
     root_node: Option<BPTreeNode<K, V>>,

@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::iter::Iterator;
 
+mod bptree;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct IndexedColumn {
     column: Column,
@@ -17,14 +19,18 @@ impl executor::Column for IndexedColumn {
     }
 }
 
+pub trait BPTree: IntoIterator<Item = Vec<Value>> + Clone {
+    fn insert(&mut self, key: Value, value: Vec<Value>) -> Result<(), String>;
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Table {
+pub struct Table<T: BPTree> {
     pub name: String,
-    rows: Vec<Vec<Value>>,
+    rows: T,
     columns: HashMap<String, IndexedColumn>,
 }
 
-impl executor::Table for Table {
+impl<T: BPTree + 'static> executor::Table for Table<T> {
     fn select_rows(&self) -> Result<Box<dyn Iterator<Item = Vec<Value>>>, String> {
         self.select_rows()
     }
@@ -60,13 +66,13 @@ impl executor::Table for Table {
     }
 }
 
-impl Table {
-    pub fn new<'a, I>(table_name: &str, iterator: I) -> Result<Table, String>
+impl<T: BPTree + 'static> Table<T> {
+    pub fn new<'a, I>(table_name: &str, columns: I, rows: T) -> Result<Table<T>, String>
     where
         I: IntoIterator<Item = &'a Column>,
     {
         let mut verified_columns = HashMap::new();
-        for (i, column) in iterator.into_iter().enumerate() {
+        for (i, column) in columns.into_iter().enumerate() {
             let column_name = &column.name;
             if verified_columns.contains_key(column_name) {
                 return Err(format!("duplicate column name: {}", column_name));
@@ -81,7 +87,7 @@ impl Table {
         }
         return Ok(Table {
             name: table_name.to_lowercase(),
-            rows: vec![],
+            rows,
             columns: verified_columns,
         });
     }
@@ -126,12 +132,12 @@ impl Table {
 
         columns
     }
-    pub fn insert_row(&mut self, row: Vec<Value>) -> Result<&mut Table, String> {
+    pub fn insert_row(&mut self, row: Vec<Value>) -> Result<&mut Table<T>, String> {
         if row.len() != self.row_len() {
             return Err(self.wrong_num_of_columns_error(row.len()));
         }
 
-        self.rows.push(row);
+        self.rows.insert(row[0].clone(), row)?;
 
         Ok(self)
     }
@@ -139,7 +145,7 @@ impl Table {
     fn insert_row_with_named_columns(
         &mut self,
         row: HashMap<String, Value>,
-    ) -> Result<&mut Table, String> {
+    ) -> Result<&mut Table<T>, String> {
         if row.len() > self.row_len() {
             return Err(self.wrong_num_of_columns_error(row.len()));
         }
@@ -156,7 +162,8 @@ impl Table {
             let (index, value) = kv;
             row_vec[*index] = value.clone();
         }
-        self.rows.push(row_vec);
+
+        self.rows.insert(row_vec[0].clone(), row_vec)?;
 
         Ok(self)
     }
@@ -193,6 +200,29 @@ impl Table {
 mod tests {
     use super::*;
 
+    #[derive(Clone)]
+    struct MockBpTree {}
+
+    impl MockBpTree {
+        fn new() -> MockBpTree {
+            MockBpTree {}
+        }
+    }
+
+    impl BPTree for MockBpTree {
+        fn insert(&mut self, key: Value, value: Vec<Value>) -> Result<(), String> {
+            panic!("not implemented")
+        }
+    }
+
+    impl IntoIterator for MockBpTree {
+        type Item = Vec<Value>;
+        type IntoIter = ::std::vec::IntoIter<Self::Item>;
+        fn into_iter(self) -> Self::IntoIter {
+            panic!("not implemented")
+        }
+    }
+
     #[test]
     fn new_tables_should_not_have_duplicate_column_names() {
         let result = Table::new(
@@ -206,6 +236,7 @@ mod tests {
                 },
             ]
             .iter(),
+            MockBpTree::new(),
         );
         assert_eq!(result.is_err(), true);
     }
@@ -223,6 +254,7 @@ mod tests {
                 },
             ]
             .iter(),
+            MockBpTree::new(),
         )
         .unwrap();
         let result = table.insert_row(vec![Value::Integer(49)]);
@@ -244,6 +276,7 @@ mod tests {
                 name: "feet".to_string(),
             }]
             .iter(),
+            MockBpTree::new(),
         )
         .unwrap();
 

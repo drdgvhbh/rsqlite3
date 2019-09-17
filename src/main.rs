@@ -10,14 +10,16 @@ mod pager;
 mod sqlite3;
 mod table;
 
+use bptree::BPTree;
 use lalrpop_util::ParseError;
 
-use ast::Ast;
+use ast::{Ast, Value};
 
 fn main() {
     let mut rl = Editor::<()>::new();
     rl.load_history("history.txt").ok();
     let mut executor = executor::Executor::new();
+    let bptree_capacity = 4;
     let print_err = |err: &str| println!("Error: {}", err.to_string());
     'main: loop {
         let readline = rl.readline("sqlite> ");
@@ -54,7 +56,11 @@ fn main() {
                 match ast {
                     Ast::Exit => break 'main,
                     Ast::Create(schema) => {
-                        let result = table::Table::new(&schema.name, schema.columns.iter());
+                        let result = table::Table::new(
+                            &schema.name,
+                            schema.columns.iter(),
+                            BPTree::<Value, Vec<Value>>::new(bptree_capacity),
+                        );
                         match result {
                             Err(err) => print_err(&err),
                             Ok(table) => {

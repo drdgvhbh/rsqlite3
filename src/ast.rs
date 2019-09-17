@@ -1,5 +1,6 @@
 use crate::executor;
 use serde::{Deserialize, Serialize};
+use std::cmp::{Ord, Ordering};
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -16,10 +17,27 @@ pub enum ColumnSet {
     Names(Vec<String>),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Value {
     Integer(i64),
     Null,
+}
+
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
+            (Value::Null, Value::Null) => Ordering::Equal,
+            (Value::Integer(_), Value::Null) => Ordering::Less,
+            (Value::Null, Value::Integer(_)) => Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl fmt::Display for Value {
