@@ -1,6 +1,7 @@
-use crate::executor;
+use crate::{executor, table};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ord, Ordering};
+use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -104,6 +105,36 @@ impl Column {
 pub struct TableSchema {
     pub name: String,
     pub columns: Vec<Column>,
+}
+
+impl TableSchema {
+    pub fn new(name: &str, columns: Vec<Column>) -> TableSchema {
+        TableSchema {
+            name: name.to_string(),
+            columns,
+        }
+    }
+}
+
+impl table::TableSchema for TableSchema {
+    fn table_name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        return self.columns.clone();
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        let mut column_names = HashSet::new();
+        for c in &self.columns {
+            if column_names.contains(&c.name) {
+                return Err(format!("duplicate column name: {}", c.name));
+            }
+            column_names.insert(c.name.clone());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -233,6 +264,23 @@ mod test_insertion {
             vec![Value::Integer(32), Value::Integer(1337)],
         );
         let result = insertion.validate();
+        assert_eq!(result.is_err(), true);
+    }
+}
+
+#[cfg(test)]
+mod test_table_schema {
+    use super::*;
+    use crate::table::TableSchema;
+
+    #[test]
+    fn validation_fails_if_there_are_duplicate_column_names() {
+        let table_schema = super::TableSchema::new(
+            "kings",
+            vec![Column::new("henry", false), Column::new("henry", false)],
+        );
+
+        let result = table_schema.validate();
         assert_eq!(result.is_err(), true);
     }
 }
