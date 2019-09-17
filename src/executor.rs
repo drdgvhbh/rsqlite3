@@ -1,12 +1,23 @@
 use crate::ast::{ColumnSet, Value};
 use std::collections::HashMap;
 
+#[cfg(test)]
+extern crate mockers_derive;
+
+#[cfg(test)]
+use mockers_derive::mocked;
+
 pub trait Column {
     fn name(&self) -> &String;
 }
 
+#[cfg_attr(test, mocked)]
 pub trait Table {
-    fn name(&self) -> &String;
+    /// Name of the table
+    ///
+    /// Returns a String rather than reference because the mocker does not
+    /// support references
+    fn name(&self) -> String;
     fn insert_row(&mut self, row: Vec<Value>) -> Result<&mut dyn Table, String>;
     fn insert_row_with_named_columns(
         &mut self,
@@ -112,50 +123,28 @@ impl<T: Table> Executor<T> {
 mod tests {
     use super::*;
     use crate::ast;
-    use crate::table;
+    use mockers::Scenario;
     use std::collections::HashMap;
-
-    #[derive(Clone)]
-    struct MockBpTree {}
-
-    impl MockBpTree {
-        fn new() -> MockBpTree {
-            MockBpTree {}
-        }
-    }
-
-    impl table::BPTree for MockBpTree {
-        fn insert(&mut self, key: Value, value: Vec<Value>) -> Result<(), String> {
-            panic!("not implemented")
-        }
-    }
-
-    impl IntoIterator for MockBpTree {
-        type Item = Vec<Value>;
-        type IntoIter = ::std::vec::IntoIter<Self::Item>;
-        fn into_iter(self) -> Self::IntoIter {
-            panic!("not implemented")
-        }
-    }
 
     #[test]
     fn should_fail_to_create_a_table_if_one_with_same_name_already_exists() {
-        let table_name = "apples";
-        let mut tables: HashMap<String, table::Table<MockBpTree>> = HashMap::new();
-        tables.insert(
-            table_name.to_string(),
-            table::Table::new(table_name, vec![].iter(), MockBpTree::new()).unwrap(),
-        );
+        let scenario = Scenario::new();
+        let table_name = "apples".to_string();
+        let (table, _) = scenario.create_mock_for::<dyn Table>();
+        let (table2, table2_handle) = scenario.create_mock_for::<dyn Table>();
+        scenario.expect(table2_handle.name().and_return("apples".to_string()));
+        let mut tables: HashMap<String, TableMock> = HashMap::new();
+        tables.insert(table_name, table);
+
         let mut executor = Executor { tables };
-        let table = table::Table::new(&table_name, vec![].iter(), MockBpTree::new()).unwrap();
-        let result = executor.add_table(table);
+        let result = executor.add_table(table2);
         assert_eq!(result.is_err(), true);
     }
 
     #[test]
     fn should_fail_to_insert_row_if_table_does_not_exist() {
         let table_name = "oranges".to_string();
-        let mut executor = Executor::<table::Table<MockBpTree>> {
+        let mut executor = Executor::<TableMock> {
             tables: HashMap::new(),
         };
 
