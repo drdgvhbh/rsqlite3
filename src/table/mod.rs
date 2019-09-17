@@ -57,8 +57,8 @@ impl<T: BPTree + 'static> executor::Table for Table<T> {
         self.row_len()
     }
 
-    fn name(&self) -> &String {
-        return &self.name;
+    fn name(&self) -> String {
+        return self.name.clone();
     }
 
     fn columns(&self) -> Vec<Box<dyn executor::Column>> {

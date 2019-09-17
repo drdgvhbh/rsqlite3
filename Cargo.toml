@@ -18,3 +18,5 @@ lru = "0.1.17"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
+mockers = "0.21.0"
+mockers_derive = "0.21.0"
