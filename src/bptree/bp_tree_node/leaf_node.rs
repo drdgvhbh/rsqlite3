@@ -6,6 +6,8 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 
+use super::super::Serializer;
+
 macro_rules! rcref {
     ($expr:expr) => {{
         Rc::new(RefCell::new($expr))
@@ -64,12 +66,13 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
     pub fn insert(
         &mut self,
         entry: Entry<K, V>,
-        degree: usize,
+        page_byte_size: usize,
+        serializer: Serializer,
     ) -> Result<Option<Rc<RefCell<LeafNode<K, V>>>>, String> {
         match self.entries.binary_search(&entry) {
             Err(index) => {
                 self.entries.insert(index, entry);
-                if self.entries.len() >= degree {
+                if serializer.serialize(&self.entries).len() >= page_byte_size {
                     return Ok(Some(self.split()));
                 }
             }
@@ -118,19 +121,19 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     macro_rules! new_leaf_node {
-        ($degree:expr, $($key:expr => $value:expr),*) => {{
+        ($page_byte_size:expr, $($key:expr => $value:expr),*) => {{
             let mut leafnode = LeafNode::<i32, Vec<i32>>::new();
-            $(assert_eq!(leafnode.insert(Entry::new($key, $value), $degree).is_err(), false);)*
+            $(assert_eq!(leafnode.insert(Entry::new($key, $value), $page_byte_size, Serializer::Mock).is_err(), false);)*
             leafnode
         }};
     }
 
     #[test]
     fn has_correct_iteration_order_after_insertion() {
-        let degree = 3;
+        let page_byte_size = 3;
 
         let leafnode = new_leaf_node!(
-            degree, 
+            page_byte_size, 
             1 => vec![1,2,3], 
             3 => vec![400, 500, 600], 
             2 => vec![-1, -2, -3]);
@@ -142,11 +145,11 @@ mod tests {
     }
 
     #[test]
-    fn nodes_are_split_when_degree_is_reached() {
-        let degree = 3;
+    fn nodes_are_split_when_page_byte_size_is_reached() {
+        let page_byte_size = 3;
 
         let leafnode = new_leaf_node!(
-            degree, 
+            page_byte_size, 
             1 => vec![1,2,3], 
             3 => vec![400, 500, 600], 
             2 => vec![-1, -2, -3]);
@@ -162,11 +165,11 @@ mod tests {
     }
 
     #[test]
-    fn nodes_are_split_when_degree_is_reached2() {
-        let degree = 4;
+    fn nodes_are_split_when_page_byte_size_is_reached2() {
+        let page_byte_size = 4;
 
         let leafnode = new_leaf_node!(
-            degree,
+            page_byte_size,
             1 => vec![1,2,3],
             3 => vec![400, 500, 600],
             2 => vec![-1, -2, -3],
@@ -191,13 +194,13 @@ mod tests {
 
     #[test]
     fn duplicate_insertion_fails() {
-        let degree = 3;
+        let page_byte_size = 3;
         let mut leafnode = new_leaf_node!(
-            degree,  
+            page_byte_size,  
             1 => vec![1,2,3], 
             3 => vec![400, 500, 600]);
         assert_eq!(
-            leafnode.insert(Entry::new(3, vec![-1, -2, -3]), degree).is_err(),
+            leafnode.insert(Entry::new(3, vec![-1, -2, -3]), page_byte_size, Serializer::Mock).is_err(),
             true
         );
     }

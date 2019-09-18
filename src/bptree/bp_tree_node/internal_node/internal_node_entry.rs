@@ -1,3 +1,4 @@
+use super::super::super::Serializer;
 use super::Entry;
 use super::{BPTreeNode, InternalNodeEntry};
 use super::{Key, Value};
@@ -44,11 +45,13 @@ impl<K: Key + 'static, V: Value + 'static> InternalNodeEntry<K, V> {
         &mut self,
         entry: Entry<K, V>,
         degree: usize,
+        page_byte_size: usize,
+        serializer: Serializer,
     ) -> Result<Option<BPTreeNode<K, V>>, String> {
         if entry.key < self.key {
-            self.left.insert(entry, degree)
+            self.left.insert(entry, degree, page_byte_size, serializer)
         } else {
-            self.right.insert(entry, degree)
+            self.right.insert(entry, degree, page_byte_size, serializer)
         }
     }
 

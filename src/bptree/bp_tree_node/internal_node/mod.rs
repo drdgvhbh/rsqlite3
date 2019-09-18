@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
+use super::super::Serializer;
 
 mod internal_node_entry;
 
@@ -89,7 +90,7 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
         return entries[entries.len() - 1].key.clone();
     }
 
-    pub fn insert(&mut self, entry: Entry<K, V>, degree: usize) -> Result<Option<BPTreeNode<K, V>>, String> {
+    pub fn insert(&mut self, entry: Entry<K, V>, degree: usize, page_byte_size: usize, serializer: Serializer) -> Result<Option<BPTreeNode<K, V>>, String> {
         match self
             .entries
             .binary_search_by_key(&entry.key, |internal_node| internal_node.key.clone())
@@ -101,7 +102,7 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
                 }
 
                 let key = entry.key.clone();
-                match self.entries[existing_index].insert(entry, degree) {
+                match self.entries[existing_index].insert(entry, degree, page_byte_size, serializer) {
                     Err(err) => return Err(err),
                     Ok(has_node_split_into_two) => match has_node_split_into_two {
                         None => {}
@@ -167,9 +168,9 @@ mod internal_node_test {
     use pretty_assertions::assert_eq;
 
     macro_rules! new_leaf_node {
-        ($degree:expr, $($key:expr => $value:expr),*) => {{
+        ($page_byte_size:expr, $($key:expr => $value:expr),*) => {{
             let mut leafnode = LeafNode::<i32, Vec<i32>>::new();
-            $(assert_eq!(leafnode.insert(Entry::new($key, $value), $degree).is_err(), false);)*
+            $(assert_eq!(leafnode.insert(Entry::new($key, $value), $page_byte_size, Serializer::Mock).is_err(), false);)*
             leafnode
         }};
     }
@@ -187,20 +188,20 @@ mod internal_node_test {
     }
 
     macro_rules! insert {
-        ($inode:expr, $degree:expr, $($key:expr => $value:expr),*) => {{
-            $(assert_eq!($inode.insert(Entry::new($key, $value), $degree).is_err(), false);)*
+        ($inode:expr, $page_byte_size:expr, $($key:expr => $value:expr),*) => {{
+            $(assert_eq!($inode.insert(Entry::new($key, $value), $page_byte_size, $page_byte_size, Serializer::Mock).is_err(), false);)*
         }};
     }
 
     #[test]
     fn has_correct_iteration_order_after_insertion() {
-        let degree = 3;
+        let page_byte_size = 3;
 
-        let mut left_node = new_leaf_node!(degree, 1 => vec![1, 2, 3]);
+        let mut left_node = new_leaf_node!(page_byte_size, 1 => vec![1, 2, 3]);
         let internal_node = new_internal_node!(
             left_node,
             new_leaf_node!(
-                degree, 
+                page_byte_size, 
                 3 => vec![400, 500, 600], 
                 2 => vec![-1, -2, -3])
         );
@@ -212,31 +213,31 @@ mod internal_node_test {
 
     #[test]
     fn internal_node_is_built_correctly() {
-        let degree = 3;
+        let page_byte_size = 3;
 
-        let mut left_node = new_leaf_node!(degree, 1 => vec![1,2,3]);
+        let mut left_node = new_leaf_node!(page_byte_size, 1 => vec![1,2,3]);
         let mut internal_node = new_internal_node!(
             left_node,
             new_leaf_node!(
-                degree, 
+                page_byte_size, 
                 3 => vec![400, 500, 600], 
                 2 => vec![-1, -2, -3])
         );
-        insert!(internal_node, degree, 4 => vec![1]);
+        insert!(internal_node, page_byte_size, 4 => vec![1]);
         assert_eq!(internal_node.keys(), vec![1, 2, 2, 2, 3, 3, 4]);
     }
 
     #[test]
     fn internal_node_is_built_correctly2() {
-        let degree = 4;
+        let page_byte_size = 4;
 
         let mut left_leafnode = new_leaf_node!(
-            degree, 
+            page_byte_size, 
             1 => vec![1, 2, 3],
             2 => vec![1, 2, 3],
             3 => vec![1, 2, 3]);
         let right_leafnode = left_leafnode
-            .insert(Entry::new(4, vec![1, 2, 3]), degree)
+            .insert(Entry::new(4, vec![1, 2, 3]), page_byte_size, Serializer::Mock)
             .unwrap()
             .unwrap();
 
@@ -253,15 +254,15 @@ mod internal_node_test {
 
     #[test]
     fn internal_node_is_built_correctly3() {
-        let degree = 4;
+        let page_byte_size = 4;
 
         let mut left_leafnode = new_leaf_node!(
-            degree, 
+            page_byte_size, 
             1 => vec![1, 2, 3],
             2 => vec![1, 2, 3],
             3 => vec![1, 2, 3]);
         let right_leafnode = left_leafnode
-            .insert(Entry::new(4, vec![1, 2, 3]), degree)
+            .insert(Entry::new(4, vec![1, 2, 3]), page_byte_size, Serializer::Mock)
             .unwrap()
             .unwrap();
 
@@ -274,7 +275,7 @@ mod internal_node_test {
         );
 
         insert!(internal_node,
-            degree,
+            page_byte_size,
             10 => vec![1],
             11 => vec![1],
             5 => vec![1],

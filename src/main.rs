@@ -20,6 +20,7 @@ fn main() {
     rl.load_history("history.txt").ok();
     let mut executor = executor::Executor::new();
     let bptree_degree = 4;
+    let bptree_page_byte_size = 16;
     let print_err = |err: &str| println!("Error: {}", err.to_string());
     'main: loop {
         let readline = rl.readline("sqlite> ");
@@ -58,7 +59,11 @@ fn main() {
                     Ast::Create(schema) => {
                         let result = table::Table::new(
                             schema,
-                            BPTree::<Value, Vec<Value>>::new(bptree_degree),
+                            BPTree::<Value, Vec<Value>>::new(
+                                bptree_degree,
+                                bptree_page_byte_size,
+                                bptree::Serializer::RMP,
+                            ),
                         );
                         match result {
                             Err(err) => print_err(&err),

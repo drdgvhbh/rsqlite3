@@ -42,14 +42,18 @@ impl<K: Key + 'static, V: Value + 'static> BPTreeNode<K, V> {
         &mut self,
         entry: Entry<K, V>,
         degree: usize,
+        page_byte_size: usize,
+        serializer: super::Serializer,
     ) -> Result<Option<BPTreeNode<K, V>>, String> {
         match &self {
             BPTreeNode::LeafNode(leaf_node) => leaf_node
                 .borrow_mut()
-                .insert(entry, degree)
+                .insert(entry, page_byte_size, serializer)
                 .map(|opt| opt.map(|rc| BPTreeNode::LeafNode(rc))),
             BPTreeNode::InternalNode(internal_node) => {
-                internal_node.borrow_mut().insert(entry, degree)
+                internal_node
+                    .borrow_mut()
+                    .insert(entry, degree, page_byte_size, serializer)
             }
         }
     }

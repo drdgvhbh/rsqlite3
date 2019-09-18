@@ -1,12 +1,15 @@
 use super::bp_tree_node::{BPTreeNode, InternalNode, LeafNode};
+use super::Serializer;
 use super::{Entry, Key, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BPTree<K: Key, V: Value> {
-    pub degree: usize,
+    pub page_byte_size: usize,
     root_node: Option<BPTreeNode<K, V>>,
+    degree: usize,
+    serializer: Serializer,
 }
 
 macro_rules! rcref {
@@ -16,9 +19,11 @@ macro_rules! rcref {
 }
 
 impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
-    pub fn new(degree: usize) -> BPTree<K, V> {
+    pub fn new(degree: usize, page_byte_size: usize, serializer: Serializer) -> BPTree<K, V> {
         BPTree {
             degree,
+            serializer,
+            page_byte_size,
             root_node: None,
         }
     }
@@ -28,27 +33,34 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
                 let new_root = LeafNode::new_from_entry(entry);
                 self.root_node = Some(BPTreeNode::LeafNode(rcref!(new_root)));
             }
-            Some(root_node) => match root_node.insert(entry, self.degree) {
-                Err(err) => return Err(err),
-                Ok(has_node_split_into_two) => match has_node_split_into_two {
-                    None => return Ok(()),
-                    Some(split_node) => match (root_node, &split_node) {
-                        (BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right)) => {
-                            self.root_node = Some(BPTreeNode::InternalNode(rcref!(
-                                InternalNode::from_leaves(left.clone(), right.clone())
-                            )));
-                        }
-                        (BPTreeNode::InternalNode(left), BPTreeNode::InternalNode(right)) => {
-                            self.root_node = Some(BPTreeNode::InternalNode(rcref!(
-                                InternalNode::from_internals(left.clone(), right.clone())
-                            )));
-                        }
-                        _ => {
-                            debug_assert!(false, "oops");
-                        }
+            Some(root_node) => {
+                match root_node.insert(
+                    entry,
+                    self.degree,
+                    self.page_byte_size,
+                    self.serializer.clone(),
+                ) {
+                    Err(err) => return Err(err),
+                    Ok(has_node_split_into_two) => match has_node_split_into_two {
+                        None => return Ok(()),
+                        Some(split_node) => match (root_node, &split_node) {
+                            (BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right)) => {
+                                self.root_node = Some(BPTreeNode::InternalNode(rcref!(
+                                    InternalNode::from_leaves(left.clone(), right.clone())
+                                )));
+                            }
+                            (BPTreeNode::InternalNode(left), BPTreeNode::InternalNode(right)) => {
+                                self.root_node = Some(BPTreeNode::InternalNode(rcref!(
+                                    InternalNode::from_internals(left.clone(), right.clone())
+                                )));
+                            }
+                            _ => {
+                                debug_assert!(false, "oops");
+                            }
+                        },
                     },
-                },
-            },
+                }
+            }
         }
 
         Ok(())
@@ -85,7 +97,7 @@ mod bptree_test {
 
     #[test]
     fn insertion_works() {
-        let mut bptree = BPTree::new(3);
+        let mut bptree = BPTree::new(3, 3, Serializer::Mock);
         bptree.insert(Entry::new(1, vec![1, 2, 3])).unwrap();
         bptree.insert(Entry::new(3, vec![400, 500, 600])).unwrap();
         bptree.insert(Entry::new(2, vec![-1, -2, -3])).unwrap();
@@ -98,7 +110,7 @@ mod bptree_test {
 
     #[test]
     fn tree_is_built_correctly() {
-        let mut bptree = BPTree::new(4);
+        let mut bptree = BPTree::new(4, 4, Serializer::Mock);
         assert_eq!(bptree.insert(Entry::new(1, vec![1])).is_err(), false);
         assert_eq!(bptree.insert(Entry::new(2, vec![1])).is_err(), false);
         assert_eq!(bptree.insert(Entry::new(3, vec![1])).is_err(), false);
