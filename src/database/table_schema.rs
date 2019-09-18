@@ -1,7 +1,28 @@
 use serde::{Deserialize, Serialize};
 
+pub struct TableSerializationSize {
+    /// Number of bytes required to store a single row
+    pub row_size: usize,
+
+    /// Number of bytes required to encode a vector that stores a collection of rows
+    ///
+    /// Example: Message Pack Family of Encoding
+    ///
+    ///
+    /// Array 32 stores an array whose length is up to (2^32)-1 elements:
+    /// ```
+    /// +--------+--------+--------+--------+--------+~~~~~~~~~~~~~~~~~+
+    /// |  0xdd  |ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|ZZZZZZZZ|    N objects    |
+    /// +--------+--------+--------+--------+--------+~~~~~~~~~~~~~~~~~+
+    /// ```
+    /// In this case, the vector size would be 5 bytes
+    pub vector_size: usize,
+}
+
 pub trait Serializer {
-    fn size(&self, obj: impl Serialize) -> usize;
+    /// Calculates the size in bytes of a row consisting of these columns
+    /// and the size of a collection of the same rows
+    fn size(&self, columns: &Vec<Column>) -> TableSerializationSize;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -10,23 +31,6 @@ pub enum DataType {
     Char(usize),
     Int,
     Real,
-}
-
-impl DataType {
-    pub fn size(&self, serializer: impl Serializer) -> usize {
-        match self {
-            DataType::Boolean => serializer.size(false),
-            DataType::Char(length) => {
-                let mut dummy_string = String::new();
-                for _ in 0..*length {
-                    dummy_string.push('A');
-                }
-                serializer.size(dummy_string)
-            }
-            DataType::Int => serializer.size(std::i32::MAX),
-            DataType::Real => serializer.size(std::f32::MAX),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,5 +51,9 @@ impl Schema {
             table_name: table_name.to_string(),
             columns,
         }
+    }
+
+    pub fn size(&self, serializer: impl Serializer) -> TableSerializationSize {
+        serializer.size(&self.columns)
     }
 }
