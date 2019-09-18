@@ -35,14 +35,14 @@ impl<K: Key + 'static, V: Value + 'static> Display for InternalNode<K, V> {
 }
 
 impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
-    pub fn from_two_leaf_nodes(
+    pub fn from_leaves(
         left: Rc<RefCell<LeafNode<K, V>>>,
         right: Rc<RefCell<LeafNode<K, V>>>,
     ) -> InternalNode<K, V> {
         InternalNode::from_two_nodes(BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right))
     }
 
-    pub fn from_two_internal_nodes(
+    pub fn from_internals(
         left: Rc<RefCell<InternalNode<K, V>>>,
         right: Rc<RefCell<InternalNode<K, V>>>,
     ) -> InternalNode<K, V> {
@@ -51,32 +51,24 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
             "right node should have entries"
         );
         let key = right.borrow().left_key();
-        let mut entries = Vec::with_capacity(right.borrow().entries.capacity());
         let new_right = Rc::new(RefCell::new(InternalNode::new_with_entries(
             right.borrow().entries.clone()[1..].to_vec(),
         )));
-        entries.push(InternalNodeEntry::new(
+        InternalNode { entries: vec![InternalNodeEntry::new(
             key,
             BPTreeNode::InternalNode(left),
             BPTreeNode::InternalNode(new_right),
-        ));
-        InternalNode { entries }
+        )] }
     }
 
     fn from_two_nodes(left: BPTreeNode<K, V>, right: BPTreeNode<K, V>) -> InternalNode<K, V> {
         debug_assert!(right.len() > 0, "right node should have entries");
         let key = right.left_key();
-        let mut entries = Vec::with_capacity(right.capacity());
-        entries.push(InternalNodeEntry::new(key, left, right));
-        InternalNode { entries }
+        InternalNode { entries: vec![InternalNodeEntry::new(key, left, right)] }
     }
 
     fn new_with_entries(entries: Vec<InternalNodeEntry<K, V>>) -> InternalNode<K, V> {
         InternalNode { entries }
-    }
-
-    fn is_full(&self) -> bool {
-        self.entries.len() >= self.entries.capacity()
     }
 
     pub fn left_key(&self) -> K {
@@ -97,7 +89,7 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
         return entries[entries.len() - 1].key.clone();
     }
 
-    pub fn insert(&mut self, entry: Entry<K, V>) -> Result<Option<BPTreeNode<K, V>>, String> {
+    pub fn insert(&mut self, entry: Entry<K, V>, degree: usize) -> Result<Option<BPTreeNode<K, V>>, String> {
         match self
             .entries
             .binary_search_by_key(&entry.key, |internal_node| internal_node.key.clone())
@@ -109,7 +101,7 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
                 }
 
                 let key = entry.key.clone();
-                match self.entries[existing_index].insert(entry) {
+                match self.entries[existing_index].insert(entry, degree) {
                     Err(err) => return Err(err),
                     Ok(has_node_split_into_two) => match has_node_split_into_two {
                         None => {}
@@ -123,10 +115,10 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
                         }
                     },
                 }
-                if self.is_full() {
+                if self.entries.len() >= degree {
                     return Ok(Some(BPTreeNode::InternalNode(self.split())));
                 }
-            }
+            } 
             Ok(_) => {
                 return Err(format!("duplicate entry: {}", entry.key));
             }
@@ -137,9 +129,7 @@ impl<K: Key + 'static, V: Value + 'static> InternalNode<K, V> {
     fn split(&mut self) -> Rc<RefCell<InternalNode<K, V>>> {
         let mid_index = self.entries.len() / 2;
         let right_split = self.entries.split_off(mid_index);
-        let mut split_with_correct_alloc = Vec::with_capacity(self.entries.capacity());
-        split_with_correct_alloc.extend(right_split);
-        let new_right = InternalNode::new_with_entries(split_with_correct_alloc);
+        let new_right = InternalNode::new_with_entries(right_split);
         Rc::new(RefCell::new(new_right))
     }
 
@@ -177,9 +167,9 @@ mod internal_node_test {
     use pretty_assertions::assert_eq;
 
     macro_rules! new_leaf_node {
-        ($capacity:expr, $($key:expr => $value:expr),*) => {{
-            let mut leafnode = LeafNode::<i32, Vec<i32>>::new($capacity);
-            $(assert_eq!(leafnode.insert(Entry::new($key, $value)).is_err(), false);)*
+        ($degree:expr, $($key:expr => $value:expr),*) => {{
+            let mut leafnode = LeafNode::<i32, Vec<i32>>::new();
+            $(assert_eq!(leafnode.insert(Entry::new($key, $value), $degree).is_err(), false);)*
             leafnode
         }};
     }
@@ -189,7 +179,7 @@ mod internal_node_test {
             let rc_right_node = Some(Rc::new(RefCell::new($right)));
             $left.next = rc_right_node.clone();
 
-            InternalNode::from_two_leaf_nodes(
+            InternalNode::from_leaves(
                 Rc::new(RefCell::new($left)),
                 rc_right_node.unwrap().clone(),
             )
@@ -197,20 +187,20 @@ mod internal_node_test {
     }
 
     macro_rules! insert {
-        ($inode:expr, $($key:expr => $value:expr),*) => {{
-            $(assert_eq!($inode.insert(Entry::new($key, $value)).is_err(), false);)*
+        ($inode:expr, $degree:expr, $($key:expr => $value:expr),*) => {{
+            $(assert_eq!($inode.insert(Entry::new($key, $value), $degree).is_err(), false);)*
         }};
     }
 
     #[test]
     fn has_correct_iteration_order_after_insertion() {
-        let capacity = 3;
+        let degree = 3;
 
-        let mut left_node = new_leaf_node!(capacity, 1 => vec![1, 2, 3]);
+        let mut left_node = new_leaf_node!(degree, 1 => vec![1, 2, 3]);
         let internal_node = new_internal_node!(
             left_node,
             new_leaf_node!(
-                capacity, 
+                degree, 
                 3 => vec![400, 500, 600], 
                 2 => vec![-1, -2, -3])
         );
@@ -222,38 +212,38 @@ mod internal_node_test {
 
     #[test]
     fn internal_node_is_built_correctly() {
-        let capacity = 3;
+        let degree = 3;
 
-        let mut left_node = new_leaf_node!(capacity, 1 => vec![1,2,3]);
+        let mut left_node = new_leaf_node!(degree, 1 => vec![1,2,3]);
         let mut internal_node = new_internal_node!(
             left_node,
             new_leaf_node!(
-                capacity, 
+                degree, 
                 3 => vec![400, 500, 600], 
                 2 => vec![-1, -2, -3])
         );
-        insert!(internal_node, 4 => vec![1]);
+        insert!(internal_node, degree, 4 => vec![1]);
         assert_eq!(internal_node.keys(), vec![1, 2, 2, 2, 3, 3, 4]);
     }
 
     #[test]
     fn internal_node_is_built_correctly2() {
-        let capacity = 4;
+        let degree = 4;
 
         let mut left_leafnode = new_leaf_node!(
-            capacity, 
+            degree, 
             1 => vec![1, 2, 3],
             2 => vec![1, 2, 3],
             3 => vec![1, 2, 3]);
         let right_leafnode = left_leafnode
-            .insert(Entry::new(4, vec![1, 2, 3]))
+            .insert(Entry::new(4, vec![1, 2, 3]), degree)
             .unwrap()
             .unwrap();
 
         let rc_right_node = Some(right_leafnode);
         left_leafnode.next = rc_right_node.clone();
 
-        let internal_node = InternalNode::from_two_leaf_nodes(
+        let internal_node = InternalNode::from_leaves(
             Rc::new(RefCell::new(left_leafnode)),
             rc_right_node.unwrap().clone(),
         );
@@ -263,27 +253,28 @@ mod internal_node_test {
 
     #[test]
     fn internal_node_is_built_correctly3() {
-        let capacity = 4;
+        let degree = 4;
 
         let mut left_leafnode = new_leaf_node!(
-            capacity, 
+            degree, 
             1 => vec![1, 2, 3],
             2 => vec![1, 2, 3],
             3 => vec![1, 2, 3]);
         let right_leafnode = left_leafnode
-            .insert(Entry::new(4, vec![1, 2, 3]))
+            .insert(Entry::new(4, vec![1, 2, 3]), degree)
             .unwrap()
             .unwrap();
 
         let rc_right_node = Some(right_leafnode);
         left_leafnode.next = rc_right_node.clone();
 
-        let mut internal_node = InternalNode::from_two_leaf_nodes(
+        let mut internal_node = InternalNode::from_leaves(
             Rc::new(RefCell::new(left_leafnode)),
             rc_right_node.unwrap().clone(),
         );
 
         insert!(internal_node,
+            degree,
             10 => vec![1],
             11 => vec![1],
             5 => vec![1],

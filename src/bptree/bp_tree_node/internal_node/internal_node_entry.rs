@@ -40,11 +40,15 @@ impl<K: Key + 'static, V: Value + 'static> InternalNodeEntry<K, V> {
         InternalNodeEntry { key, left, right }
     }
 
-    pub fn insert(&mut self, entry: Entry<K, V>) -> Result<Option<BPTreeNode<K, V>>, String> {
+    pub fn insert(
+        &mut self,
+        entry: Entry<K, V>,
+        degree: usize,
+    ) -> Result<Option<BPTreeNode<K, V>>, String> {
         if entry.key < self.key {
-            self.left.insert(entry)
+            self.left.insert(entry, degree)
         } else {
-            self.right.insert(entry)
+            self.right.insert(entry, degree)
         }
     }
 

@@ -9,6 +9,12 @@ pub struct BPTree<K: Key, V: Value> {
     root_node: Option<BPTreeNode<K, V>>,
 }
 
+macro_rules! rcref {
+    ($expr:expr) => {{
+        Rc::new(RefCell::new($expr))
+    }};
+}
+
 impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
     pub fn new(degree: usize) -> BPTree<K, V> {
         BPTree {
@@ -19,25 +25,23 @@ impl<K: Key + 'static, V: Value + 'static> BPTree<K, V> {
     pub fn insert(&mut self, entry: Entry<K, V>) -> Result<(), String> {
         match &mut self.root_node {
             None => {
-                let new_root = LeafNode::new_from_entry(self.degree, entry);
-                self.root_node = Some(BPTreeNode::LeafNode(Rc::new(RefCell::new(new_root))));
+                let new_root = LeafNode::new_from_entry(entry);
+                self.root_node = Some(BPTreeNode::LeafNode(rcref!(new_root)));
             }
-            Some(root_node) => match root_node.insert(entry) {
+            Some(root_node) => match root_node.insert(entry, self.degree) {
                 Err(err) => return Err(err),
                 Ok(has_node_split_into_two) => match has_node_split_into_two {
                     None => return Ok(()),
                     Some(split_node) => match (root_node, &split_node) {
                         (BPTreeNode::LeafNode(left), BPTreeNode::LeafNode(right)) => {
-                            let new_root =
-                                InternalNode::from_two_leaf_nodes(left.clone(), right.clone());
-                            self.root_node =
-                                Some(BPTreeNode::InternalNode(Rc::new(RefCell::new(new_root))));
+                            self.root_node = Some(BPTreeNode::InternalNode(rcref!(
+                                InternalNode::from_leaves(left.clone(), right.clone())
+                            )));
                         }
                         (BPTreeNode::InternalNode(left), BPTreeNode::InternalNode(right)) => {
-                            let new_root =
-                                InternalNode::from_two_internal_nodes(left.clone(), right.clone());
-                            self.root_node =
-                                Some(BPTreeNode::InternalNode(Rc::new(RefCell::new(new_root))));
+                            self.root_node = Some(BPTreeNode::InternalNode(rcref!(
+                                InternalNode::from_internals(left.clone(), right.clone())
+                            )));
                         }
                         _ => {
                             debug_assert!(false, "oops");

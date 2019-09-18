@@ -6,6 +6,13 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 
+macro_rules! rcref {
+    ($expr:expr) => {{
+        Rc::new(RefCell::new($expr))
+    }};
+}
+
+
 impl<K: Key + 'static, V: Value + 'static> Display for LeafNode<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -39,14 +46,12 @@ impl<K: Key + 'static, V: Value + 'static> IntoIterator for LeafNode<K, V> {
 }
 
 impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
-    pub fn new(capacity: usize) -> LeafNode<K, V> {
-        LeafNode::new_with_entries(Vec::with_capacity(capacity))
+    pub fn new() -> LeafNode<K, V> {
+        LeafNode::new_with_entries(vec![])
     }
 
-    pub fn new_from_entry(capacity: usize, entry: Entry<K, V>) -> LeafNode<K, V> {
-        let mut entries = Vec::with_capacity(capacity);
-        entries.push(entry);
-        LeafNode::new_with_entries(entries)
+    pub fn new_from_entry(entry: Entry<K, V>) -> LeafNode<K, V> {
+        LeafNode::new_with_entries(vec![entry])
     }
 
     fn new_with_entries(entries: Vec<Entry<K, V>>) -> LeafNode<K, V> {
@@ -56,18 +61,15 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
         }
     }
 
-    fn is_full(&self) -> bool {
-        self.entries.len() >= self.entries.capacity()
-    }
-
     pub fn insert(
         &mut self,
         entry: Entry<K, V>,
+        degree: usize,
     ) -> Result<Option<Rc<RefCell<LeafNode<K, V>>>>, String> {
         match self.entries.binary_search(&entry) {
             Err(index) => {
                 self.entries.insert(index, entry);
-                if self.is_full() {
+                if self.entries.len() >= degree {
                     return Ok(Some(self.split()));
                 }
             }
@@ -81,11 +83,9 @@ impl<K: Key + 'static, V: Value + 'static> LeafNode<K, V> {
     fn split(&mut self) -> Rc<RefCell<LeafNode<K, V>>> {
         let mid_index = self.entries.len() / 2;
         let right_split = self.entries.split_off(mid_index);
-        let mut split_with_correct_alloc = Vec::with_capacity(self.entries.capacity());
-        split_with_correct_alloc.extend(right_split);
-        let mut new_right = LeafNode::new_with_entries(split_with_correct_alloc);
+        let mut new_right = LeafNode::new_with_entries(right_split);
         new_right.next = self.next.clone();
-        self.next = Some(Rc::new(RefCell::new(new_right)));
+        self.next = Some(rcref!(new_right));
         self.next.clone().unwrap()
     }
 
@@ -118,19 +118,19 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     macro_rules! new_leaf_node {
-        ($capacity:expr, $($key:expr => $value:expr),*) => {{
-            let mut leafnode = LeafNode::<i32, Vec<i32>>::new($capacity);
-            $(assert_eq!(leafnode.insert(Entry::new($key, $value)).is_err(), false);)*
+        ($degree:expr, $($key:expr => $value:expr),*) => {{
+            let mut leafnode = LeafNode::<i32, Vec<i32>>::new();
+            $(assert_eq!(leafnode.insert(Entry::new($key, $value), $degree).is_err(), false);)*
             leafnode
         }};
     }
 
     #[test]
     fn has_correct_iteration_order_after_insertion() {
-        let capacity = 3;
+        let degree = 3;
 
         let leafnode = new_leaf_node!(
-            capacity, 
+            degree, 
             1 => vec![1,2,3], 
             3 => vec![400, 500, 600], 
             2 => vec![-1, -2, -3]);
@@ -142,11 +142,11 @@ mod tests {
     }
 
     #[test]
-    fn nodes_are_split_when_capacity_is_reached() {
-        let capacity = 3;
+    fn nodes_are_split_when_degree_is_reached() {
+        let degree = 3;
 
         let leafnode = new_leaf_node!(
-            capacity, 
+            degree, 
             1 => vec![1,2,3], 
             3 => vec![400, 500, 600], 
             2 => vec![-1, -2, -3]);
@@ -162,11 +162,11 @@ mod tests {
     }
 
     #[test]
-    fn nodes_are_split_when_capacity_is_reached2() {
-        let capacity = 4;
+    fn nodes_are_split_when_degree_is_reached2() {
+        let degree = 4;
 
         let leafnode = new_leaf_node!(
-            capacity,
+            degree,
             1 => vec![1,2,3],
             3 => vec![400, 500, 600],
             2 => vec![-1, -2, -3],
@@ -191,13 +191,13 @@ mod tests {
 
     #[test]
     fn duplicate_insertion_fails() {
-        let capacity = 3;
+        let degree = 3;
         let mut leafnode = new_leaf_node!(
-            capacity, 
+            degree,  
             1 => vec![1,2,3], 
             3 => vec![400, 500, 600]);
         assert_eq!(
-            leafnode.insert(Entry::new(3, vec![-1, -2, -3])).is_err(),
+            leafnode.insert(Entry::new(3, vec![-1, -2, -3]), degree).is_err(),
             true
         );
     }

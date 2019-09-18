@@ -38,13 +38,19 @@ impl<K: Key + 'static, V: Value + 'static> Display for BPTreeNode<K, V> {
 }
 
 impl<K: Key + 'static, V: Value + 'static> BPTreeNode<K, V> {
-    pub fn insert(&mut self, entry: Entry<K, V>) -> Result<Option<BPTreeNode<K, V>>, String> {
+    pub fn insert(
+        &mut self,
+        entry: Entry<K, V>,
+        degree: usize,
+    ) -> Result<Option<BPTreeNode<K, V>>, String> {
         match &self {
             BPTreeNode::LeafNode(leaf_node) => leaf_node
                 .borrow_mut()
-                .insert(entry)
+                .insert(entry, degree)
                 .map(|opt| opt.map(|rc| BPTreeNode::LeafNode(rc))),
-            BPTreeNode::InternalNode(internal_node) => internal_node.borrow_mut().insert(entry),
+            BPTreeNode::InternalNode(internal_node) => {
+                internal_node.borrow_mut().insert(entry, degree)
+            }
         }
     }
 
@@ -59,13 +65,6 @@ impl<K: Key + 'static, V: Value + 'static> BPTreeNode<K, V> {
         match &self {
             BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().right_key(),
             BPTreeNode::InternalNode(internal_node) => internal_node.borrow().right_key(),
-        }
-    }
-
-    fn capacity(&self) -> usize {
-        match &self {
-            BPTreeNode::LeafNode(leaf_node) => leaf_node.borrow().entries.capacity(),
-            BPTreeNode::InternalNode(internal_node) => internal_node.borrow().entries.capacity(),
         }
     }
 
