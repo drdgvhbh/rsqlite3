@@ -132,7 +132,7 @@ impl table::TableSchema for TableSchema {
             if column_names.contains(&c.name) {
                 return Err(format!("duplicate column name: {}", c.name));
             }
-            if has_primary_key {
+            if c.is_primary_key && has_primary_key {
                 return Err(format!(
                     "table \"{}\" has more than one primary key",
                     self.name
