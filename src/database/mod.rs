@@ -88,10 +88,10 @@ mod tests {
 
         let table_name = "bank_accounts";
         database
-            .create_table(Schema::new(table_name))
+            .create_table(Schema::new(table_name, vec![]))
             .expect("first table should be inserted");
         database
-            .create_table(Schema::new(table_name))
+            .create_table(Schema::new(table_name, vec![]))
             .expect_err("table with the same name should not be inserted");
     }
 }

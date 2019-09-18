@@ -29,14 +29,23 @@ impl DataType {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Column {
+    pub name: String,
+    pub datatype: DataType,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Schema {
     pub table_name: String,
+    pub columns: Vec<Column>,
 }
 
 impl Schema {
-    pub fn new(table_name: &str) -> Schema {
+    pub fn new(table_name: &str, columns: Vec<Column>) -> Schema {
         Schema {
             table_name: table_name.to_string(),
+            columns,
         }
     }
 }
