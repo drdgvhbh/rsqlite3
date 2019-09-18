@@ -57,8 +57,7 @@ fn main() {
                     Ast::Exit => break 'main,
                     Ast::Create(schema) => {
                         let result = table::Table::new(
-                            &schema.name,
-                            schema.columns.iter(),
+                            schema,
                             BPTree::<Value, Vec<Value>>::new(bptree_capacity),
                         );
                         match result {

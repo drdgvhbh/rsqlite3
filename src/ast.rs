@@ -1,6 +1,7 @@
-use crate::executor;
+use crate::{executor, table};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ord, Ordering};
+use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -88,12 +89,62 @@ impl Selection {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Column {
     pub name: String,
+    pub is_primary_key: bool,
+}
+
+impl Column {
+    pub fn new(name: &str, is_primary_key: bool) -> Column {
+        Column {
+            name: name.to_string(),
+            is_primary_key,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct TableSchema {
     pub name: String,
     pub columns: Vec<Column>,
+}
+
+impl TableSchema {
+    pub fn new(name: &str, columns: Vec<Column>) -> TableSchema {
+        TableSchema {
+            name: name.to_string(),
+            columns,
+        }
+    }
+}
+
+impl table::TableSchema for TableSchema {
+    fn table_name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        return self.columns.clone();
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        let mut column_names = HashSet::new();
+        let mut has_primary_key = false;
+        for c in &self.columns {
+            if column_names.contains(&c.name) {
+                return Err(format!("duplicate column name: {}", c.name));
+            }
+            if has_primary_key {
+                return Err(format!(
+                    "table \"{}\" has more than one primary key",
+                    self.name
+                ));
+            }
+            if c.is_primary_key {
+                has_primary_key = true
+            }
+            column_names.insert(c.name.clone());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -203,9 +254,7 @@ mod test_parsing {
                 insert_stmt,
                 Ast::Create(TableSchema {
                     name: "apples".to_string(),
-                    columns: vec![Column {
-                        name: "slices".to_string(),
-                    }]
+                    columns: vec![Column::new("slices", false)]
                 })
             )
         }
@@ -225,6 +274,34 @@ mod test_insertion {
             vec![Value::Integer(32), Value::Integer(1337)],
         );
         let result = insertion.validate();
+        assert_eq!(result.is_err(), true);
+    }
+}
+
+#[cfg(test)]
+mod test_table_schema {
+    use super::*;
+    use crate::table::TableSchema;
+
+    #[test]
+    fn validation_fails_if_there_are_duplicate_column_names() {
+        let table_schema = super::TableSchema::new(
+            "kings",
+            vec![Column::new("henry", false), Column::new("henry", false)],
+        );
+
+        let result = table_schema.validate();
+        assert_eq!(result.is_err(), true);
+    }
+
+    #[test]
+    fn validation_fails_if_there_are_duplicate_primary_keys() {
+        let table_schema = super::TableSchema::new(
+            "kings",
+            vec![Column::new("henry", true), Column::new("james", true)],
+        );
+
+        let result = table_schema.validate();
         assert_eq!(result.is_err(), true);
     }
 }

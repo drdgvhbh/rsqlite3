@@ -5,7 +5,7 @@ grammar;
 pub Ast: Ast = {
     Exit => Ast::Exit,
     Create Table <name:Identifier> <columns:ColumnList> Semi
-        => Ast::Create(TableSchema{ name, columns }),
+        => Ast::Create(TableSchema::new(&name, columns)),
     Insert Into <table_name:Identifier> <column_names:IdentifierList?>
         Values <values:ValueList> Semi
         => Ast::Insert(Insertion::new(
@@ -30,7 +30,7 @@ ColumnList: Vec<Column> = {
 }
 
 Column: Column = {
-    <name:Identifier> Datatype? => Column{ name }
+    <name:Identifier> Datatype? <pk:PrimaryKey?> => Column::new(&name, pk.is_some())
 }
 
 ColumnSelection: ColumnSet = {
@@ -87,6 +87,7 @@ match {
     r"(?i)insert" => Insert,
     r"(?i)into" => Into,
     r"(?i)values" => Values,
+    r"(?i)primary key" => PrimaryKey,
     r"[0-9]+" => IntegerValue,
 } else {
     _
