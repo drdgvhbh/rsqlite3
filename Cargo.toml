@@ -1,0 +1,16 @@
+[package]
+name = "rust-sql-db"
+version = "0.1.0"
+authors = ["Ryan Lee <drdgvhbh@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chashmap = "2.2.2"
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"
+mockers = "0.21.0"
+mockers_derive = "0.21.0"
+tempfile = "3.1.0"

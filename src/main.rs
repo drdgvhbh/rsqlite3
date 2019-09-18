@@ -1,0 +1,3 @@
+mod database;
+
+fn main() {}
