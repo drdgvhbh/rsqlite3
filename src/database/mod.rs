@@ -16,7 +16,7 @@ pub use table_schema::Schema;
 pub trait Table {}
 
 pub trait Factory<T: Table> {
-    fn new_table(&self, schema: Schema) -> T;
+    fn new_table(&self, schema: Schema) -> Result<T, String>;
 }
 
 pub struct Database<T: Table, F: Factory<T>> {
@@ -37,12 +37,13 @@ impl<T: Table, F: Factory<T>> Database<T, F> {
 
     /// Creates a new table in the database
     pub fn create_table(&self, schema: Schema) -> Result<(), String> {
-        if self.tables.contains_key(&schema.table_name) {
-            return Err(format!("table {} already exists", &schema.table_name).to_string());
+        let table_name = schema.table_name.clone();
+        if self.tables.contains_key(&table_name) {
+            return Err(format!("table {} already exists", &table_name).to_string());
         }
 
-        self.tables
-            .insert_new(schema.table_name.clone(), self.factory.new_table(schema));
+        let new_table = self.factory.new_table(schema)?;
+        self.tables.insert_new(table_name, new_table);
 
         Ok(())
     }
@@ -62,9 +63,9 @@ mod mocks {
     }
 
     impl<T: Table, F: Fn() -> T> Factory<T> for MockFactory<T, F> {
-        fn new_table(&self, _: Schema) -> T {
+        fn new_table(&self, _: Schema) -> Result<T, String> {
             let next_table = &self.next_table;
-            next_table()
+            Ok(next_table())
         }
     }
 }

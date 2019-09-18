@@ -8,10 +8,10 @@ pub struct Table<PA: PageAllocator> {
 }
 
 impl<PA: PageAllocator> Table<PA> {
-    pub fn new(schema: Schema, page_allocator: PA) -> Table<PA> {
-        Table {
+    pub fn new(schema: Schema, page_allocator: PA) -> Result<Table<PA>, String> {
+        Ok(Table {
             schema,
             page_allocator,
-        }
+        })
     }
 }
