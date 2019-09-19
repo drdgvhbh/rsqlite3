@@ -19,10 +19,11 @@ pub struct TableSerializationSize {
     pub vector_size: usize,
 }
 
-pub trait Serializer {
+pub trait Serializer: Clone {
     /// Calculates the size in bytes of a row consisting of these columns
     /// and the size of a collection of the same rows
     fn size(&self, columns: &Vec<Column>) -> TableSerializationSize;
+    fn serialize<S: Serialize>(&self, obj: &S) -> Vec<u8>;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,6 +40,15 @@ pub struct Column {
     pub datatype: DataType,
 }
 
+impl Column {
+    pub fn new(name: &str, datatype: DataType) -> Column {
+        Column {
+            name: name.to_string(),
+            datatype,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Schema {
     pub table_name: String,
@@ -53,7 +63,7 @@ impl Schema {
         }
     }
 
-    pub fn size(&self, serializer: impl Serializer) -> TableSerializationSize {
+    pub fn size(&self, serializer: &impl Serializer) -> TableSerializationSize {
         serializer.size(&self.columns)
     }
 }

@@ -1,9 +1,10 @@
 use chashmap::CHashMap;
 use std::fs::File;
 
+pub mod data;
+pub mod factory;
+mod io;
 mod table;
-mod table_schema;
-mod table_value;
 
 #[cfg(test)]
 extern crate mockers_derive;
@@ -11,8 +12,7 @@ extern crate mockers_derive;
 #[cfg(test)]
 use mockers_derive::mocked;
 
-pub use table_schema::Schema;
-pub use table_value::TableValue;
+pub use data::{Column, DataType, Schema, Serializer, TableValue};
 
 pub struct RecordID {
     pub page_number: u32,
