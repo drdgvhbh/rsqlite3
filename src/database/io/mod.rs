@@ -53,7 +53,7 @@ impl<S: Serializer> Pager<S> {
         }
     }
 
-    pub fn write_header(&mut self, schema: Schema) -> Result<(), String> {
+    pub fn write_header(&mut self, schema: Schema) -> Result<Schema, String> {
         let tss = schema.size(&self.serializer);
         let mut slot_capacity = self.page_byte_size / tss.row_size;
         let mut slot_capacity_bytes = self.serializer.serialize(&slot_capacity);
@@ -83,7 +83,7 @@ impl<S: Serializer> Pager<S> {
 
         write(&mut self.file, 0, &page_header_bytes, &self.serializer)?;
 
-        Ok(())
+        Ok(page_header.schema)
     }
 }
 

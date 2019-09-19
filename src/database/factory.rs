@@ -5,6 +5,7 @@ use super::{
 };
 use positioned_io_preview::RandomAccessFile;
 use std::fs::File;
+use std::sync::Mutex;
 
 pub struct FactoryConfiguration<S: Serializer> {
     pub database_dir: String,
@@ -37,7 +38,7 @@ impl<S: Serializer> super::Factory<Table<Page, Pager<S>>> for Factory<S> {
             self.conf.page_byte_size,
             self.conf.serializer.clone(),
         );
-        pager.write_header(schema)?;
-        panic!("TODO")
+        let reowned_schema = pager.write_header(schema)?;
+        Table::new(reowned_schema, Mutex::new(pager))
     }
 }
