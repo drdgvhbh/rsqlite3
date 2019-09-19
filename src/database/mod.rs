@@ -6,6 +6,8 @@ pub mod factory;
 mod io;
 mod table;
 
+use std::sync::Mutex;
+
 #[cfg(test)]
 extern crate mockers_derive;
 
@@ -39,13 +41,13 @@ pub trait Factory<T: Table> {
 
 pub struct Database<T: Table, F: Factory<T>> {
     directory: File,
-    factory: F,
+    factory: Mutex<F>,
     tables: CHashMap<String, T>,
 }
 
 impl<T: Table, F: Factory<T>> Database<T, F> {
     /// Creates a new database
-    pub fn new(directory: File, factory: F) -> Database<T, F> {
+    pub fn new(directory: File, factory: Mutex<F>) -> Database<T, F> {
         Database {
             directory,
             factory,
@@ -60,7 +62,8 @@ impl<T: Table, F: Factory<T>> Database<T, F> {
             return Err(format!("table {} already exists", &table_name).to_string());
         }
 
-        let new_table = self.factory.new_table(schema)?;
+        let factory = self.factory.lock().map_err(|err| format!("{}", err))?;
+        let new_table = factory.new_table(schema)?;
         self.tables.insert_new(table_name, new_table);
 
         Ok(())
@@ -110,10 +113,10 @@ mod tests {
 
         let database = Database::new(
             tempfile::tempfile().unwrap(),
-            mocks::MockFactory::new(|| {
+            Mutex::new(mocks::MockFactory::new(|| {
                 let (table, _) = scenario.create_mock_for::<dyn Table>();
                 table
-            }),
+            })),
         );
 
         let table_name = "bank_accounts";
