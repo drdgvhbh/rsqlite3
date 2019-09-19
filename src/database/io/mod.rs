@@ -103,12 +103,3 @@ fn write<S: Serializer>(
 
     Ok(bytes_written)
 }
-
-fn generate_empty_slots(num_slots: usize) -> Vec<bool> {
-    let mut slots = vec![];
-    for _ in 0..num_slots {
-        slots.push(true);
-    }
-
-    slots
-}
