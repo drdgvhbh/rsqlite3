@@ -1,4 +1,4 @@
-use super::{data::TableSerializationSize, table, Schema, Serializer, TableValue};
+use super::{table, Schema, Serializer, TableValue};
 use positioned_io_preview::RandomAccessFile;
 use positioned_io_preview::WriteAt;
 use serde::{Deserialize, Serialize};
@@ -80,26 +80,35 @@ impl<S: Serializer> Pager<S> {
         if page_header_bytes.len() > self.page_byte_size {
             return Err("page size is not large enough to fight page header".to_string());
         }
-
-        write(&mut self.file, 0, &page_header_bytes, &self.serializer)?;
+        self.write(0, &page_header_bytes)?;
 
         Ok(page_header.schema)
     }
-}
 
-fn write<S: Serializer>(
-    file: &mut RandomAccessFile,
-    position: u64,
-    bytes: &[u8],
-    serializer: &S,
-) -> Result<usize, String> {
-    let schema_size = serializer.serialize(&bytes.len());
-    let mut bytes_written = file
-        .write_at(position, &schema_size)
-        .map_err(|err| format!("{}", err))?;
-    bytes_written += file
-        .write_at(position + (bytes_written as u64), &bytes)
-        .map_err(|err| format!("{}", err))?;
+    /// Writes bytes into a file at position
+    ///
+    /// ```
+    /// +--------+~~~~~~~~~~~~~~~+~~~~~~~~~~~~+
+    /// | size   |  size_size    |  bytes     |
+    /// | 1 byte |  1-255 bytes  |  2^8 bytes |
+    /// +--------+~~~~~~~~~~~~~~~+~~~~~~~~~~~~+
+    /// ```
+    fn write(&mut self, position: u64, bytes: &[u8]) -> Result<usize, String> {
+        let serializer = &self.serializer;
+        let file = &mut self.file;
+        let size = serializer.serialize(&bytes.len());
+        let size_size = serializer.serialize(&size.len());
+        debug_assert!(size_size.len() <= std::u8::MAX as usize);
+        let mut bytes_written = file
+            .write_at(position, &size_size)
+            .map_err(|err| format!("{}", err))?;
+        bytes_written += file
+            .write_at(position + (bytes_written as u64), &size)
+            .map_err(|err| format!("{}", err))?;
+        bytes_written += file
+            .write_at(position + (bytes_written as u64), &bytes)
+            .map_err(|err| format!("{}", err))?;
 
-    Ok(bytes_written)
+        Ok(bytes_written)
+    }
 }
