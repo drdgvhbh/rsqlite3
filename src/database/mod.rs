@@ -1,10 +1,10 @@
 use chashmap::CHashMap;
-use std::fs::File;
+use std::collections::HashMap;
 
 pub mod data;
 pub mod factory;
 mod io;
-mod table;
+pub mod table;
 
 use std::sync::Mutex;
 
@@ -32,7 +32,9 @@ impl RecordID {
 
 #[cfg_attr(test, mocked)]
 pub trait Table {
+    fn name(&self) -> &str;
     fn insert(&self, row: Vec<TableValue>) -> Result<RecordID, String>;
+    fn flush(&self) -> Result<(), String>;
 }
 
 pub trait Factory<T: Table> {
@@ -41,20 +43,17 @@ pub trait Factory<T: Table> {
 
 pub struct Database<T: Table, F: Factory<T>> {
     factory: Mutex<F>,
-    tables: CHashMap<String, T>,
+    tables: HashMap<String, T>,
 }
 
 impl<T: Table, F: Factory<T>> Database<T, F> {
     /// Creates a new database
-    pub fn new(factory: Mutex<F>) -> Database<T, F> {
-        Database {
-            factory,
-            tables: CHashMap::new(),
-        }
+    pub fn new(factory: Mutex<F>, tables: HashMap<String, T>) -> Database<T, F> {
+        Database { factory, tables }
     }
 
     /// Creates a new table in the database
-    pub fn create_table(&self, schema: Schema) -> Result<(), String> {
+    pub fn create_table(&mut self, schema: Schema) -> Result<(), String> {
         let table_name = schema.table_name.clone();
         if self.tables.contains_key(&table_name) {
             return Err(format!("table {} already exists", &table_name).to_string());
@@ -62,7 +61,7 @@ impl<T: Table, F: Factory<T>> Database<T, F> {
 
         let factory = self.factory.lock().map_err(|err| format!("{}", err))?;
         let new_table = factory.new_table(schema)?;
-        self.tables.insert_new(table_name, new_table);
+        self.tables.insert(table_name, new_table);
 
         Ok(())
     }
@@ -74,6 +73,14 @@ impl<T: Table, F: Factory<T>> Database<T, F> {
 
         let table = self.tables.get(table_name).unwrap();
         let record_id = table.insert(row)?;
+
+        Ok(())
+    }
+
+    pub fn flush(&mut self) -> Result<(), String> {
+        for table in self.tables.iter_mut() {
+            table.1.flush()?;
+        }
 
         Ok(())
     }
@@ -109,10 +116,13 @@ mod tests {
     fn test_unique_table_constraint() {
         let scenario = Scenario::new();
 
-        let database = Database::new(Mutex::new(mocks::MockFactory::new(|| {
-            let (table, _) = scenario.create_mock_for::<dyn Table>();
-            table
-        })));
+        let mut database = Database::new(
+            Mutex::new(mocks::MockFactory::new(|| {
+                let (table, _) = scenario.create_mock_for::<dyn Table>();
+                table
+            })),
+            HashMap::new(),
+        );
 
         let table_name = "bank_accounts";
         database

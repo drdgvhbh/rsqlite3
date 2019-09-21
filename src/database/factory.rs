@@ -22,6 +22,14 @@ impl<S: Serializer> Factory<S> {
     pub fn new(conf: FactoryConfiguration<S>) -> Factory<S> {
         Factory { conf }
     }
+
+    pub fn load_table_from_file(&self, file: File) -> Result<Table<Pager<S>>, String> {
+        let ra_file = RandomAccessFile::try_new(file).map_err(|err| format!("{}", err))?;
+
+        let pager = Pager::load_from(ra_file, self.conf.serializer.clone())?;
+        let schema = pager.schema().clone();
+        Table::new(schema, Mutex::new(pager))
+    }
 }
 
 impl<S: Serializer> super::Factory<Table<Pager<S>>> for Factory<S> {
@@ -38,7 +46,7 @@ impl<S: Serializer> super::Factory<Table<Pager<S>>> for Factory<S> {
             .map_err(|err| format!("{}", err))?;
         let ra_file = RandomAccessFile::try_new(file).map_err(|err| format!("{}", err))?;
 
-        let mut pager = Pager::new(
+        let pager = Pager::new(
             ra_file,
             &schema,
             self.conf.page_byte_size,
@@ -47,3 +55,5 @@ impl<S: Serializer> super::Factory<Table<Pager<S>>> for Factory<S> {
         Table::new(schema, Mutex::new(pager))
     }
 }
+
+//

@@ -3,8 +3,8 @@ use positioned_io_preview::RandomAccessFile;
 use positioned_io_preview::ReadAt;
 use positioned_io_preview::WriteAt;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::collections::BinaryHeap;
-use std::collections::HashMap;
 use std::convert::TryInto;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ type PageNumber = usize;
 pub struct Pager<S: Serializer> {
     file: RandomAccessFile,
     page_header: PageHeader,
-    pages: HashMap<PageNumber, Vec<Option<Vec<TableValue>>>>,
+    pages: BTreeMap<PageNumber, Vec<Option<Vec<TableValue>>>>,
     serializer: S,
 }
 
@@ -53,25 +53,52 @@ impl<S: Serializer> table::Pager for Pager<S> {
         if self.page_header.free_pages.peek().is_none() {
             return Err("table is full; allocate a new page".into());
         }
-        let page_number = self.page_header.free_pages.peek().unwrap();
+        let free_pages = &mut self.page_header.free_pages;
+        let page_number = free_pages.peek().unwrap().clone();
 
-        let empty_slot_idx = self
-            .pages
-            .get(&page_number)
-            .unwrap()
+        let page = self.pages.get_mut(&page_number).unwrap();
+        let empty_slots = page
             .iter()
             .enumerate()
-            .find(|&r| r.1.is_none())
-            .unwrap()
-            .0;
+            .filter(|&r| r.1.is_none())
+            .collect::<Vec<_>>();
 
-        let page = self.pages.get_mut(page_number).unwrap();
+        let empty_slot_idx = empty_slots[0].0;
+        if empty_slots.len() == 1 {
+            free_pages.pop();
+        }
         page[empty_slot_idx] = Some(row);
 
         Ok(RecordID::new(
-            (*page_number).try_into().unwrap(),
+            (page_number).try_into().unwrap(),
             empty_slot_idx.try_into().unwrap(),
         ))
+    }
+
+    fn flush(&mut self) -> Result<(), String> {
+        let header_bytes = self.serializer.serialize(&self.page_header);
+        write(&mut self.file, 0, &header_bytes, &self.serializer)?;
+
+        let page_byte_size = self.page_header.page_byte_size;
+
+        for page in self.pages.iter() {
+            let (page_number, rows) = page;
+            let serialized_rows = self.serializer.serialize(&rows);
+            let mut bytes = vec![0; page_byte_size];
+            let position = page_number * page_byte_size;
+
+            self.file
+                .write_at(position.try_into().unwrap(), &bytes)
+                .map_err(|err| format!("{}", err))?;
+            for (i, byte) in serialized_rows.into_iter().enumerate() {
+                bytes[i] = byte;
+            }
+            self.file
+                .write_at(position.try_into().unwrap(), &bytes)
+                .map_err(|err| format!("{}", err))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -85,31 +112,37 @@ impl<S: Serializer> Pager<S> {
         let page_header = write_header(&mut file, schema, page_byte_size, &serializer)?;
         Ok(Pager {
             file,
-            pages: HashMap::new(),
+            pages: BTreeMap::new(),
             page_header,
             serializer,
         })
     }
 
-    pub fn read_header(&self) -> Result<PageHeader, String> {
-        let mut size = [0; 1];
-        let mut bytes_read = self
-            .file
-            .read_at(0, &mut size)
-            .map_err(|err| format!("{}", err))?;
-        let mut size_size = vec![0; size[0] as usize];
-        bytes_read += self
-            .file
-            .read_at(bytes_read.try_into().unwrap(), &mut size_size)
-            .map_err(|err| format!("{}", err))?;
-        let header_size: u8 = self.serializer.deserialize(&size_size)?;
+    pub fn load_from(mut file: RandomAccessFile, serializer: S) -> Result<Pager<S>, String> {
+        let bytes = read(&mut file, 0, &serializer)?;
+        let page_header: PageHeader = serializer.deserialize(&bytes)?;
 
-        let mut page_header_bytes = vec![0; header_size as usize];
-        self.file
-            .read_at(bytes_read.try_into().unwrap(), &mut page_header_bytes)
-            .map_err(|err| format!("{}", err))?;
+        let mut pages = BTreeMap::new();
+        for page_number in 1..page_header.num_pages + 1 {
+            let position = page_number * page_header.page_byte_size;
+            let mut buf = vec![0; page_header.page_byte_size];
+            file.read_at(position as u64, &mut buf)
+                .map_err(|err| format!("{}", err))?;
 
-        self.serializer.deserialize(&page_header_bytes)
+            let page: Vec<Option<Vec<TableValue>>> = serializer.deserialize(&buf)?;
+            pages.insert(page_number, page);
+        }
+
+        Ok(Pager {
+            file,
+            pages,
+            page_header,
+            serializer,
+        })
+    }
+
+    pub fn schema(&self) -> &Schema {
+        &self.page_header.schema
     }
 
     fn write(&mut self, position: u64, bytes: &[u8]) -> Result<usize, String> {
@@ -125,19 +158,9 @@ fn write_header<S: Serializer>(
 ) -> Result<PageHeader, String> {
     let tss = schema.size(serializer);
     let mut page_capacity = page_byte_size / tss.row_size;
-    let mut slot_capacity_bytes = serializer.serialize(&page_capacity);
-    let mut slots_bytes = serializer.serialize(&vec![false; page_capacity]);
 
-    while 1
-        + slot_capacity_bytes.len()
-        + slots_bytes.len()
-        + tss.vector_size
-        + tss.row_size * page_capacity
-        > page_byte_size
-    {
+    while tss.vector_size + tss.row_size * page_capacity > page_byte_size {
         page_capacity -= 1;
-        slot_capacity_bytes = serializer.serialize(&page_capacity);
-        slots_bytes = serializer.serialize(&vec![false; page_capacity]);
     }
 
     let page_header = PageHeader {
@@ -162,7 +185,7 @@ fn write_header<S: Serializer>(
 /// ```
 /// +--------+~~~~~~~~~~~~~~~+~~~~~~~~~~~~+
 /// | size   |  size_size    |  bytes     |
-/// | 1 byte |  1-255 bytes  |  2^8 bytes |
+/// | 1 byte |  1-255 bytes  |  N bytes |
 /// +--------+~~~~~~~~~~~~~~~+~~~~~~~~~~~~+
 /// ```
 fn write<S: Serializer>(
@@ -186,4 +209,30 @@ fn write<S: Serializer>(
         .map_err(|err| format!("{}", err))?;
 
     Ok(bytes_written)
+}
+
+fn read<S: Serializer>(
+    file: &mut RandomAccessFile,
+    position: u64,
+    serializer: &S,
+) -> Result<Vec<u8>, String> {
+    let serializer = &serializer;
+    let mut buf = [0; 1];
+    let mut bytes_read = file
+        .read_at(position, &mut buf)
+        .map_err(|err| format!("{}", err))?;
+    let size_of_size: usize = serializer.deserialize(&buf)?;
+
+    let mut buf = vec![0; size_of_size];
+    bytes_read += file
+        .read_at(position + bytes_read as u64, &mut buf)
+        .map_err(|err| format!("{}", err))?;
+    let size: usize = serializer.deserialize(&buf)?;
+
+    let mut buf = vec![0; size];
+    bytes_read += file
+        .read_at(position + bytes_read as u64, &mut buf)
+        .map_err(|err| format!("{}", err))?;
+
+    Ok(buf)
 }

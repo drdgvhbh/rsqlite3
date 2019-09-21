@@ -1,6 +1,6 @@
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TableValue {
     Boolean(bool),
     Char(String),
@@ -8,7 +8,7 @@ pub enum TableValue {
     Real(f32),
 }
 
-impl Serialize for TableValue {
+/* impl Serialize for TableValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -21,3 +21,13 @@ impl Serialize for TableValue {
         }
     }
 }
+ */
+/* impl<'de> Deserialize<'de> for TableValue {
+    fn deserialize<D>(deserializer: D) -> Result<TableValue, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(visitor: V)(I32Visitor)
+    }
+}
+ */
