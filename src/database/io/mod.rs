@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::collections::BinaryHeap;
 use std::convert::TryInto;
+use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PageHeader {
@@ -19,13 +20,46 @@ pub struct PageHeader {
 type PageNumber = usize;
 
 pub struct Pager<S: Serializer> {
+    write_lock: Mutex<()>,
     file: RandomAccessFile,
     page_header: PageHeader,
     pages: BTreeMap<PageNumber, Vec<Option<Vec<TableValue>>>>,
     serializer: S,
 }
+/*
+impl<S: Serializer> table::ReadPager for Pager<S> {
+    fn rows(&self) -> Result<Vec<&Vec<TableValue>>, String> {
+        let mut rows = vec![];
+        for page in self.pages.iter().map(|page| page.1).collect::<Vec<_>>() {
+            for row in page {
+                if row.is_some() {
+                    rows.push(row.as_ref().unwrap());
+                }
+            }
+        }
+
+        Ok(rows)
+    }
+} */
 
 impl<S: Serializer> table::Pager for Pager<S> {
+    fn rows(&self) -> Result<Vec<Vec<&TableValue>>, String> {
+        let mut rows = vec![];
+        for page in self.pages.iter().map(|page| page.1).collect::<Vec<_>>() {
+            for page_rows in page {
+                if page_rows.is_some() {
+                    let mut page_row = vec![];
+                    for row in page_rows.as_ref().unwrap() {
+                        page_row.push(row);
+                    }
+                    rows.push(page_row);
+                }
+            }
+        }
+
+        Ok(rows)
+    }
+
     fn has_free_pages(&self) -> Result<bool, String> {
         Ok(self.page_header.free_pages.peek().is_none())
     }
@@ -50,6 +84,8 @@ impl<S: Serializer> table::Pager for Pager<S> {
     }
 
     fn insert(&mut self, row: Vec<TableValue>) -> Result<RecordID, String> {
+        let _ = self.write_lock.lock().map_err(|err| format!("{}", err))?;
+
         if self.page_header.free_pages.peek().is_none() {
             return Err("table is full; allocate a new page".into());
         }
@@ -76,6 +112,8 @@ impl<S: Serializer> table::Pager for Pager<S> {
     }
 
     fn flush(&mut self) -> Result<(), String> {
+        let _ = self.write_lock.lock().map_err(|err| format!("{}", err))?;
+
         let header_bytes = self.serializer.serialize(&self.page_header);
         write(&mut self.file, 0, &header_bytes, &self.serializer)?;
 
@@ -111,6 +149,7 @@ impl<S: Serializer> Pager<S> {
     ) -> Result<Pager<S>, String> {
         let page_header = write_header(&mut file, schema, page_byte_size, &serializer)?;
         Ok(Pager {
+            write_lock: Mutex::new(()),
             file,
             pages: BTreeMap::new(),
             page_header,
@@ -134,6 +173,7 @@ impl<S: Serializer> Pager<S> {
         }
 
         Ok(Pager {
+            write_lock: Mutex::new(()),
             file,
             pages,
             page_header,

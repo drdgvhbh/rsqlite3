@@ -1,5 +1,4 @@
-pub use super::database::data::{Column, DataType, Schema, TableValue};
-use std::collections::HashSet;
+pub use super::database::data::{Column, ColumnSet, DataType, Schema, TableValue};
 
 #[derive(Debug)]
 pub enum Ast {
@@ -19,16 +18,10 @@ pub enum SQLStatement {
     Select(Selection),
 }
 
-#[derive(Debug, Clone)]
-pub enum ColumnSet {
-    WildCard,
-    Names(Vec<String>),
-}
-
 #[derive(Debug)]
 pub struct Selection {
-    table_name: String,
-    columns: ColumnSet,
+    pub table_name: String,
+    pub columns: ColumnSet,
 }
 
 impl Selection {
@@ -40,10 +33,6 @@ impl Selection {
     }
     pub fn validate(&self) -> Result<(), String> {
         return Ok(());
-    }
-
-    fn columns(&self) -> ColumnSet {
-        self.columns.clone()
     }
 }
 /*

@@ -5,7 +5,7 @@ use super::{
 };
 use positioned_io_preview::RandomAccessFile;
 use std::fs::{File, OpenOptions};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct FactoryConfiguration<S: Serializer> {
     pub database_dir: String,
@@ -28,7 +28,7 @@ impl<S: Serializer> Factory<S> {
 
         let pager = Pager::load_from(ra_file, self.conf.serializer.clone())?;
         let schema = pager.schema().clone();
-        Table::new(schema, Mutex::new(pager))
+        Table::new(schema, pager)
     }
 }
 
@@ -52,7 +52,8 @@ impl<S: Serializer> super::Factory<Table<Pager<S>>> for Factory<S> {
             self.conf.page_byte_size,
             self.conf.serializer.clone(),
         )?;
-        Table::new(schema, Mutex::new(pager))
+
+        Table::new(schema, pager)
     }
 }
 

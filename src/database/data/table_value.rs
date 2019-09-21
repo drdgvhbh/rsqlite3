@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TableValue {
@@ -6,6 +7,19 @@ pub enum TableValue {
     Char(String),
     Int(i32),
     Real(f32),
+    Null,
+}
+
+impl fmt::Display for TableValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            TableValue::Boolean(boolean) => write!(f, "{}", boolean),
+            TableValue::Char(s) => write!(f, "{}", s),
+            TableValue::Int(int) => write!(f, "{}", int),
+            TableValue::Real(float) => write!(f, "{}", float),
+            TableValue::Null => write!(f, "null"),
+        }
+    }
 }
 
 /* impl Serialize for TableValue {

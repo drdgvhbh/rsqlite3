@@ -127,7 +127,7 @@ fn execute_program() -> Result<(), String> {
                             }
                         }
                         SQLStatement::Select(selection) => {
-                            /*                          let result = executor.select(selection);
+                            let result = db.select(&selection.table_name, &selection.columns);
                             match result {
                                 Err(err) => print_err(&err),
                                 Ok(rows) => {
@@ -140,7 +140,7 @@ fn execute_program() -> Result<(), String> {
                                         }
                                     }
                                 }
-                            } */
+                            }
                         }
                     },
                 }

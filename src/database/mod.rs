@@ -1,4 +1,3 @@
-use chashmap::CHashMap;
 use std::collections::HashMap;
 
 pub mod data;
@@ -14,7 +13,7 @@ extern crate mockers_derive;
 #[cfg(test)]
 use mockers_derive::mocked;
 
-pub use data::{Column, DataType, Schema, Serializer, TableValue};
+pub use data::{Column, ColumnSet, DataType, Schema, Serializer, TableValue};
 
 pub struct RecordID {
     pub page_number: u32,
@@ -33,8 +32,9 @@ impl RecordID {
 #[cfg_attr(test, mocked)]
 pub trait Table {
     fn name(&self) -> &str;
-    fn insert(&self, row: Vec<TableValue>) -> Result<RecordID, String>;
-    fn flush(&self) -> Result<(), String>;
+    fn insert(&mut self, row: Vec<TableValue>) -> Result<RecordID, String>;
+    fn flush(&mut self) -> Result<(), String>;
+    fn rows(&self) -> Result<Vec<Vec<&TableValue>>, String>;
 }
 
 pub trait Factory<T: Table> {
@@ -66,15 +66,28 @@ impl<T: Table, F: Factory<T>> Database<T, F> {
         Ok(())
     }
 
-    pub fn insert(&self, table_name: &str, row: Vec<TableValue>) -> Result<(), String> {
+    pub fn insert(&mut self, table_name: &str, row: Vec<TableValue>) -> Result<(), String> {
+        if self.tables.get(table_name).is_none() {
+            return Err(format!("no such table: {}", table_name));
+        }
+
+        let table = self.tables.get_mut(table_name).unwrap();
+        let record_id = table.insert(row)?;
+
+        Ok(())
+    }
+
+    pub fn select(
+        &self,
+        table_name: &str,
+        column_set: &ColumnSet,
+    ) -> Result<Vec<Vec<&TableValue>>, String> {
         if self.tables.get(table_name).is_none() {
             return Err(format!("no such table: {}", table_name));
         }
 
         let table = self.tables.get(table_name).unwrap();
-        let record_id = table.insert(row)?;
-
-        Ok(())
+        table.rows()
     }
 
     pub fn flush(&mut self) -> Result<(), String> {

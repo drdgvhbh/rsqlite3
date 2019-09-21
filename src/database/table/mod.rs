@@ -1,20 +1,20 @@
 pub use super::{RecordID, Schema, TableValue};
-use std::sync::Mutex;
 
 pub trait Pager {
     fn has_free_pages(&self) -> Result<bool, String>;
     fn allocate_page(&mut self) -> Result<(), String>;
     fn insert(&mut self, row: Vec<TableValue>) -> Result<RecordID, String>;
     fn flush(&mut self) -> Result<(), String>;
+    fn rows(&self) -> Result<Vec<Vec<&TableValue>>, String>;
 }
 
 pub struct Table<PA: Pager> {
     schema: Schema,
-    pager: Mutex<PA>,
+    pager: PA,
 }
 
 impl<PA: Pager> Table<PA> {
-    pub fn new(schema: Schema, pager: Mutex<PA>) -> Result<Table<PA>, String> {
+    pub fn new(schema: Schema, pager: PA) -> Result<Table<PA>, String> {
         Ok(Table { schema, pager })
     }
 
@@ -28,18 +28,19 @@ impl<PA: Pager> super::Table for Table<PA> {
         self.name()
     }
 
-    fn insert(&self, row: Vec<TableValue>) -> Result<RecordID, String> {
-        let mut pager = self.pager.lock().unwrap();
-
-        if pager.has_free_pages()? {
-            pager.allocate_page().map(|_| ())?;
+    fn insert(&mut self, row: Vec<TableValue>) -> Result<RecordID, String> {
+        if self.pager.has_free_pages()? {
+            self.pager.allocate_page().map(|_| ())?;
         }
 
-        pager.insert(row)
+        self.pager.insert(row)
     }
 
-    fn flush(&self) -> Result<(), String> {
-        let mut pager = self.pager.lock().unwrap();
-        pager.flush()
+    fn flush(&mut self) -> Result<(), String> {
+        self.pager.flush()
+    }
+
+    fn rows(&self) -> Result<Vec<Vec<&TableValue>>, String> {
+        self.pager.rows()
     }
 }

@@ -71,3 +71,9 @@ impl Schema {
         serializer.size(&self.columns)
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum ColumnSet {
+    WildCard,
+    Names(Vec<String>),
+}
