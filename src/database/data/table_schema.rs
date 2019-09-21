@@ -1,3 +1,4 @@
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 pub struct TableSerializationSize {
@@ -24,9 +25,10 @@ pub trait Serializer: Clone {
     /// and the size of a collection of the same rows
     fn size(&self, columns: &Vec<Column>) -> TableSerializationSize;
     fn serialize<S: Serialize>(&self, obj: &S) -> Vec<u8>;
+    fn deserialize<D: DeserializeOwned>(&self, obj: &[u8]) -> Result<D, String>;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DataType {
     Boolean,
     Char(usize),
@@ -34,7 +36,7 @@ pub enum DataType {
     Real,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Column {
     pub name: String,
     pub datatype: DataType,
@@ -49,7 +51,7 @@ impl Column {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Schema {
     pub table_name: String,
     pub columns: Vec<Column>,

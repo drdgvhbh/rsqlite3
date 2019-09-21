@@ -1,10 +1,10 @@
 use super::{
-    io::{Page, Pager},
+    io::Pager,
     table::Table,
     {Schema, Serializer},
 };
 use positioned_io_preview::RandomAccessFile;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::sync::Mutex;
 
 pub struct FactoryConfiguration<S: Serializer> {
@@ -24,21 +24,26 @@ impl<S: Serializer> Factory<S> {
     }
 }
 
-impl<S: Serializer> super::Factory<Table<Page, Pager<S>>> for Factory<S> {
-    fn new_table(&self, schema: Schema) -> Result<Table<Page, Pager<S>>, String> {
+impl<S: Serializer> super::Factory<Table<Pager<S>>> for Factory<S> {
+    fn new_table(&self, schema: Schema) -> Result<Table<Pager<S>>, String> {
         let file_name = format!(
             "{}/{}.{}",
             self.conf.database_dir, schema.table_name, self.conf.table_file_ext
         );
-        let file = File::create(file_name).map_err(|err| format!("{}", err))?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(file_name)
+            .map_err(|err| format!("{}", err))?;
         let ra_file = RandomAccessFile::try_new(file).map_err(|err| format!("{}", err))?;
 
         let mut pager = Pager::new(
             ra_file,
+            &schema,
             self.conf.page_byte_size,
             self.conf.serializer.clone(),
-        );
-        let reowned_schema = pager.write_header(schema)?;
-        Table::new(reowned_schema, Mutex::new(pager))
+        )?;
+        Table::new(schema, Mutex::new(pager))
     }
 }

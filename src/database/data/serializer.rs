@@ -1,6 +1,7 @@
 use super::{Column, DataType, TableSerializationSize, TableValue};
 use rmp_serde as rmps;
-use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct MessagePackSerializer {}
@@ -35,5 +36,9 @@ impl super::Serializer for MessagePackSerializer {
 
     fn serialize<S: Serialize>(&self, obj: &S) -> Vec<u8> {
         rmps::to_vec(&obj).unwrap()
+    }
+
+    fn deserialize<D: DeserializeOwned>(&self, obj: &[u8]) -> Result<D, String> {
+        rmps::from_slice::<D>(&obj).map_err(|err| format!("{}", err))
     }
 }

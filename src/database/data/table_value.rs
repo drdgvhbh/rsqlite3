@@ -1,6 +1,6 @@
 use serde::{Serialize, Serializer};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TableValue {
     Boolean(bool),
     Char(String),
