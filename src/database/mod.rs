@@ -40,16 +40,14 @@ pub trait Factory<T: Table> {
 }
 
 pub struct Database<T: Table, F: Factory<T>> {
-    directory: File,
     factory: Mutex<F>,
     tables: CHashMap<String, T>,
 }
 
 impl<T: Table, F: Factory<T>> Database<T, F> {
     /// Creates a new database
-    pub fn new(directory: File, factory: Mutex<F>) -> Database<T, F> {
+    pub fn new(factory: Mutex<F>) -> Database<T, F> {
         Database {
-            directory,
             factory,
             tables: CHashMap::new(),
         }
@@ -111,13 +109,10 @@ mod tests {
     fn test_unique_table_constraint() {
         let scenario = Scenario::new();
 
-        let database = Database::new(
-            tempfile::tempfile().unwrap(),
-            Mutex::new(mocks::MockFactory::new(|| {
-                let (table, _) = scenario.create_mock_for::<dyn Table>();
-                table
-            })),
-        );
+        let database = Database::new(Mutex::new(mocks::MockFactory::new(|| {
+            let (table, _) = scenario.create_mock_for::<dyn Table>();
+            table
+        })));
 
         let table_name = "bank_accounts";
         database

@@ -1,0 +1,102 @@
+use crate::ast::{
+    Ast, Column, ColumnSet, DataType, Insertion, MetaCommand, SQLStatement, Schema, 
+    Selection, TableValue,
+};
+
+grammar;
+
+pub Ast: Ast = {
+    Exit => Ast::MetaCommand(MetaCommand::Exit),
+    Create Table <name:Identifier> <columns:ColumnList> Semi
+        => Ast::SQLStatement(
+            SQLStatement::Create(Schema::new(&name, columns))),
+    Insert Into <table_name:Identifier> <column_names:IdentifierList?>
+        Values <values:ValueList> Semi
+        => Ast::SQLStatement(SQLStatement::Insert(
+            Insertion::new(
+                &table_name,
+                column_names,
+                values
+            )
+        )),
+    Select <columns:ColumnSelection> From <table_name:Identifier> Semi
+        => Ast::SQLStatement(SQLStatement::Select(
+            Selection::new(
+                &table_name,
+                columns,
+            )
+        ))
+}
+
+ColumnList: Vec<Column> = {
+    "(" <a:Column> <b:("," Column)*> ")" => {
+        let mut cols = vec![a];
+        cols.extend(b.iter()
+            .map(|x| x.1.clone()));
+        cols
+    }
+}
+
+Column: Column = {
+    <name:Identifier> <dt:DataType> <pk:PrimaryKey?> => Column::new(&name, dt, pk.is_some())
+}
+
+ColumnSelection: ColumnSet = {
+    Star => ColumnSet::WildCard,
+    <id_list:ColumnIdentifierList> => ColumnSet::Names(id_list)
+}
+
+DataType: DataType = {
+    Integer => DataType::Int,
+}
+
+ColumnIdentifierList: Vec<String> = {
+    <a:Identifier> <b:("," Identifier)*> => {
+        let mut identifier_list = vec![a];
+        identifier_list.extend(b.iter()
+            .map(|x| x.1.clone()));
+        identifier_list
+    }
+}
+
+IdentifierList: Vec<String> = {
+    "(" <a:Identifier> <b:("," Identifier)*> ")" => {
+        let mut identifier_list = vec![a];
+        identifier_list.extend(b.iter()
+            .map(|x| x.1.clone()));
+        identifier_list
+    }
+}
+
+Identifier: String = <s:r"[a-zA-Z][a-zA-Z0-9]*"> => s.to_string();
+
+ValueList: Vec<TableValue> = {
+    "(" <a:Value> <b:("," Value)*> ")" => {
+        let mut value_list = vec![a];
+        value_list.extend(b.iter()
+            .map(|x| x.1.clone()));
+        value_list
+    }
+}
+
+Value: TableValue = {
+    <i:IntegerValue> => TableValue::Int(i.parse::<i32>().unwrap())
+}
+
+match {
+    r".exit" => Exit,
+    r";" => Semi,
+    r"\*" => Star,
+    r"(?i)from" => From,
+    r"(?i)select" => Select,
+    r"(?i)create" => Create,
+    r"(?i)table" => Table,
+    r"(?i)integer" => Integer,
+    r"(?i)insert" => Insert,
+    r"(?i)into" => Into,
+    r"(?i)values" => Values,
+    r"(?i)primary key" => PrimaryKey,
+    r"[0-9]+" => IntegerValue,
+} else {
+    _
+}

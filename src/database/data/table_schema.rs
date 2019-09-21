@@ -40,13 +40,15 @@ pub enum DataType {
 pub struct Column {
     pub name: String,
     pub datatype: DataType,
+    pub is_primary_key: bool,
 }
 
 impl Column {
-    pub fn new(name: &str, datatype: DataType) -> Column {
+    pub fn new(name: &str, datatype: DataType, is_primary_key: bool) -> Column {
         Column {
             name: name.to_string(),
             datatype,
+            is_primary_key,
         }
     }
 }
